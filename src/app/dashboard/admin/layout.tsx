@@ -22,6 +22,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       items: [
         { name: 'Employees', href: '/dashboard/admin/employees', icon: UserCircle },
         { name: 'Leads', href: '/dashboard/admin/leads', icon: Users },
+        { name: 'Teams', href: '/dashboard/admin/teams', icon: Users },
         { name: 'Projects', href: '/dashboard/admin/projects', icon: Briefcase },
         { name: 'Tasks', href: '/dashboard/admin/tasks', icon: CheckSquare }
       ]
@@ -36,6 +37,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     {
       title: "System & Settings",
       items: [
+        { name: 'Roles & Permissions', href: '/dashboard/admin/roles', icon: ShieldCheck },
         { name: 'Settings', href: '/dashboard/admin/settings', icon: Settings }
       ]
     }

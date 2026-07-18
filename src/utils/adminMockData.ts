@@ -9,6 +9,11 @@ export const mockLeads = [
   { id: 'l2', name: 'Sarah Lead', department: 'Engineering', email: 'sarah@qnnx.com', avatar: 'S' },
 ];
 
+export const mockTeams = [
+  { id: 'tm1', name: 'Core Product Design', department: 'Design', leadId: 'l1', members: 4, status: 'Active' },
+  { id: 'tm2', name: 'Backend Infrastructure', department: 'Engineering', leadId: 'l2', members: 6, status: 'Active' },
+];
+
 export const mockEmployees = [
   { id: 'e1', name: 'John Doe', role: 'UI/UX Designer', email: 'john@qnnx.com', avatar: 'J' },
   { id: 'e2', name: 'Jane Smith', role: 'Frontend Developer', email: 'jane@qnnx.com', avatar: 'J' },

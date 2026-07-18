@@ -182,6 +182,35 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 />
               </div>
+              <div className="pt-2 border-t border-gray-100">
+                <p className="text-[11px] font-bold text-gray-800 uppercase tracking-wider mb-3">Personal Details</p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Phone Number</label>
+                    <input 
+                      type="tel" 
+                      placeholder="+1 (555) 000-0000"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Home Address</label>
+                    <input 
+                      type="text" 
+                      placeholder="123 Main St, City, State"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">SSN (Secure)</label>
+                    <input 
+                      type="password" 
+                      placeholder="XXX-XX-XXXX"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">

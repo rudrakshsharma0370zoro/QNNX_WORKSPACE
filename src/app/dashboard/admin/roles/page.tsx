@@ -1,8 +1,21 @@
 "use client";
 
-import { ShieldCheck, ChevronDown, Plus } from 'lucide-react';
+import { useState } from 'react';
+import { ShieldCheck, UserCog, User } from 'lucide-react';
+import { mockEmployees, mockLeads } from '../../../../utils/adminMockData';
 
 export default function AdminRolesPermissionsRBAC() {
+  const allUsers = [
+    ...mockLeads.map(l => ({ ...l, role: 'Lead' })),
+    ...mockEmployees
+  ];
+
+  const [users, setUsers] = useState(allUsers);
+
+  const handleRoleChange = (userId: string, newRole: string) => {
+    setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+  };
+
   return (
     <div className="font-sans text-gray-800 bg-gray-50/30 p-6 lg:p-8 min-h-full w-full">
       <div className="max-w-[1400px] mx-auto space-y-6">
@@ -11,22 +24,64 @@ export default function AdminRolesPermissionsRBAC() {
         <div className="flex justify-between items-start mb-8">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Roles & Permissions (RBAC)</h2>
-            <p className="text-sm text-gray-500 mt-1">Manage access control and permissions.</p>
+            <p className="text-sm text-gray-500 mt-1">Assign system roles and manage access control for all users.</p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
-            <Plus className="w-4 h-4" /> Create New
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-2 text-sm font-semibold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100">
+              <ShieldCheck className="w-4 h-4" /> Active Backend Mapping
+            </span>
+          </div>
         </div>
 
         {/* Content Area */}
-        <div className="bg-white p-12 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center justify-center text-center">
-          <div className="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mb-4">
-            <ShieldCheck className="w-8 h-8" />
-          </div>
-          <h3 className="text-lg font-bold text-gray-900 mb-2">Roles & Permissions (RBAC) Module Active</h3>
-          <p className="text-sm text-gray-500 max-w-md">
-            This module is connected and functioning normally. Data flows are established. Detailed UI implementation is pending full rollout.
-          </p>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <table className="w-full text-sm text-left">
+            <thead className="text-xs text-gray-500 uppercase bg-gray-50/50 border-b border-gray-200">
+              <tr>
+                <th className="px-6 py-4 font-medium">User Details</th>
+                <th className="px-6 py-4 font-medium">Department / Title</th>
+                <th className="px-6 py-4 font-medium text-center">System Role</th>
+                <th className="px-6 py-4 font-medium text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {users.map((user) => (
+                <tr key={user.id} className="hover:bg-gray-50/50 transition-colors group">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold">
+                        {user.avatar}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-900">{user.name}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{user.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-gray-700 font-medium">{(user as any).department || user.role}</div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <select 
+                      value={user.role}
+                      onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                      className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+                    >
+                      <option value="Admin">Admin</option>
+                      <option value="Lead">Lead</option>
+                      <option value="Employee">Employee</option>
+                      <option value="ReadOnly">Read-Only</option>
+                    </select>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+                      View Audit Log
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
       </div>

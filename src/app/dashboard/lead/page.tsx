@@ -2,8 +2,9 @@
 
 import { 
   Users, Calendar, ChevronDown, ClipboardList, 
-  Hourglass, CheckCircle2, Target 
+  Hourglass, CheckCircle2, Target, AlertTriangle
 } from 'lucide-react';
+import { mockLogs } from '../../../utils/adminMockData';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -324,49 +325,23 @@ export default function LeadDashboard() {
 
           {/* Recent Activity */}
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-            <h3 className="font-bold text-gray-900 mb-6">Recent Activity</h3>
+            <h3 className="font-bold text-gray-900 mb-6">Recent Activity (ActivityLog)</h3>
             <div className="space-y-6 relative before:absolute before:inset-0 before:ml-2.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-200 before:to-transparent">
-              
-              <div className="relative flex items-start gap-4">
-                <div className="w-5 h-5 rounded-full bg-white border-2 border-blue-500 z-10 flex items-center justify-center mt-0.5 shrink-0">
-                  <CheckCircle2 className="w-3 h-3 text-blue-500" />
+              {mockLogs.map((log) => (
+                <div key={log.id} className="relative flex items-start gap-4">
+                  <div className={`w-5 h-5 rounded-full bg-white border-2 z-10 flex items-center justify-center mt-0.5 shrink-0 ${
+                    log.status === 'Success' ? 'border-green-500' : log.status === 'Error' ? 'border-red-500' : 'border-orange-500'
+                  }`}>
+                    {log.status === 'Success' ? <CheckCircle2 className="w-3 h-3 text-green-500" /> :
+                     log.status === 'Error' ? <AlertTriangle className="w-3 h-3 text-red-500" /> :
+                     <ClipboardList className="w-3 h-3 text-orange-500" />}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-700">{log.user} executed <span className="font-semibold text-gray-900">{log.action}</span> on {log.target}</p>
+                    <p className="text-xs text-gray-400 mt-1">{new Date(log.time).toLocaleString()}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-700">Alex updated lead status to <span className="font-semibold text-gray-900">"In Progress"</span></p>
-                  <p className="text-xs text-gray-400 mt-1">10 minutes ago</p>
-                </div>
-              </div>
-
-              <div className="relative flex items-start gap-4">
-                <div className="w-5 h-5 rounded-full bg-white border-2 border-green-500 z-10 flex items-center justify-center mt-0.5 shrink-0">
-                  <CheckCircle2 className="w-3 h-3 text-green-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-700">Sarah completed a task <span className="font-semibold text-gray-900">"UI Design"</span></p>
-                  <p className="text-xs text-gray-400 mt-1">25 minutes ago</p>
-                </div>
-              </div>
-
-              <div className="relative flex items-start gap-4">
-                <div className="w-5 h-5 rounded-full bg-white border-2 border-orange-400 z-10 flex items-center justify-center mt-0.5 shrink-0">
-                  <ClipboardList className="w-3 h-3 text-orange-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-700">New lead <span className="font-semibold text-gray-900">"GreenEdge Corp."</span> added by John</p>
-                  <p className="text-xs text-gray-400 mt-1">1 hour ago</p>
-                </div>
-              </div>
-
-              <div className="relative flex items-start gap-4">
-                <div className="w-5 h-5 rounded-full bg-white border-2 border-purple-500 z-10 flex items-center justify-center mt-0.5 shrink-0">
-                  <Calendar className="w-3 h-3 text-purple-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-700">Meeting scheduled with client</p>
-                  <p className="text-xs text-gray-400 mt-1">2 hours ago</p>
-                </div>
-              </div>
-
+              ))}
             </div>
           </div>
 

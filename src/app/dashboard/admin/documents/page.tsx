@@ -1,14 +1,30 @@
 "use client";
-import { Filter, Search, CloudUpload, FileText, FileSpreadsheet, Image as ImageIcon, Lock } from 'lucide-react';
+import { Filter, Search, CloudUpload, FileText, FileSpreadsheet, Image as ImageIcon, Lock, Download } from 'lucide-react';
 
 export default function AdminDocuments() {
   const documents = [
     { name: 'QNNX_Architecture_v2.pdf', category: '/ARCHITECTURE', size: '2.4 MB', date: 'Oct 12, 2026', icon: <FileText className="w-5 h-5 text-blue-500" /> },
     { name: 'API_Endpoints_List.csv', category: '/OTHER-SOURCES', size: '84 KB', date: 'Oct 05, 2026', icon: <FileSpreadsheet className="w-5 h-5 text-green-500" /> },
-    { name: 'Employee_Handbook.docx', category: '/OTHER-SOURCES', size: '1.1 MB', date: 'Sep 28, 2026', icon: <FileText className="w-5 h-5 text-blue-500" /> },
-    { name: 'Dashboard_Mockup.png', category: '/OTHER-SOURCES', size: '4.2 MB', date: 'Oct 14, 2026', icon: <ImageIcon className="w-5 h-5 text-purple-500" /> },
+    { name: 'Employee_Handbook.docx', category: '/EMPLOYEE-RECORDS', size: '1.1 MB', date: 'Sep 28, 2026', icon: <FileText className="w-5 h-5 text-blue-500" /> },
+    { name: 'Dashboard_Mockup.png', category: '/MARKETING-ASSETS', size: '4.2 MB', date: 'Oct 14, 2026', icon: <ImageIcon className="w-5 h-5 text-purple-500" /> },
     { name: 'passport_copy_secure.pdf', category: '/PERSONAL-INFO', size: '1.6 MB', date: 'Mar 15, 2024', icon: <Lock className="w-4 h-4 text-gray-400" /> },
   ];
+
+  const storageCategories = [
+    { name: '/public-assets', tier: 'Tier 1: Public' },
+    { name: '/marketing-assets', tier: 'Tier 1: Public' },
+    { name: '/architecture', tier: 'Tier 2: Internal' },
+    { name: '/project-docs', tier: 'Tier 2: Internal' },
+    { name: '/other-sources', tier: 'Tier 2: Internal' },
+    { name: '/employee-records', tier: 'Tier 3: Confidential' },
+    { name: '/financial-records', tier: 'Tier 3: Confidential' },
+    { name: '/personal-info', tier: 'Tier 4: Restricted' },
+    { name: '/legal-contracts', tier: 'Tier 4: Restricted' }
+  ];
+
+  const handleDownload = (fileName: string) => {
+    alert(`Downloading ${fileName} via S3...`);
+  };
 
   return (
     <div className="font-sans text-gray-800 bg-[#F8FAFC] p-6 lg:p-8 min-h-full w-full">
@@ -59,7 +75,7 @@ export default function AdminDocuments() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded bg-gray-100 border border-gray-200 ${doc.category === '/PERSONAL-INFO' ? 'text-red-500' : 'text-gray-500'}`}>
+                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded bg-gray-100 border border-gray-200 ${doc.category === '/PERSONAL-INFO' || doc.category === '/LEGAL-CONTRACTS' ? 'text-red-500' : 'text-gray-500'}`}>
                         {doc.category}
                       </span>
                     </td>
@@ -70,7 +86,16 @@ export default function AdminDocuments() {
                       {doc.date}
                     </td>
                     <td className="px-6 py-4 text-right text-gray-400">
-                      <button className="hover:text-gray-900 transition-colors">•••</button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => handleDownload(doc.name)}
+                          className="p-1.5 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                          title="Download from S3"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                        <button className="p-1.5 hover:text-gray-900 transition-colors">•••</button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -89,11 +114,11 @@ export default function AdminDocuments() {
               <p className="text-[12px] text-gray-500 mb-4">Select a category to securely store your document.</p>
               
               <div className="mb-4">
-                <label className="block text-[11px] font-semibold text-gray-500 mb-1">Category</label>
+                <label className="block text-[11px] font-semibold text-gray-500 mb-1">Storage Category (9 Tiers)</label>
                 <select className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] text-gray-700 focus:outline-none">
-                  <option>/architecture</option>
-                  <option>/project-docs</option>
-                  <option>/employee-records</option>
+                  {storageCategories.map((cat, i) => (
+                    <option key={i} value={cat.name}>{cat.name} ({cat.tier})</option>
+                  ))}
                 </select>
               </div>
 
@@ -103,7 +128,6 @@ export default function AdminDocuments() {
                 <p className="text-[11px] text-gray-400 mt-1">or drag and drop files here</p>
               </div>
             </div>
-
 
           </div>
         </div>
