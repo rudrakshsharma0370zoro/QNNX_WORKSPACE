@@ -22,7 +22,7 @@ import { getGoogleAccessToken, GoogleScopes } from './googleServiceAuth';
 
 const IDENTITY_TOOLKIT_BASE = 'https://identitytoolkit.googleapis.com/v1';
 
-export const VALID_ROLES = ['user', 'lead', 'admin'] as const;
+export const VALID_ROLES = ['pending', 'user', 'lead', 'admin'] as const;
 export type AppRole = (typeof VALID_ROLES)[number];
 
 export function isValidRole(value: unknown): value is AppRole {

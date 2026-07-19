@@ -13,7 +13,7 @@ export const runtime = 'edge';
 const VALID_STATUSES = ['Pending', 'In Progress', 'Completed'] as const;
 const VALID_PRIORITIES = ['low', 'medium', 'high'] as const;
 // Fields only a lead/admin may edit (everyone may change status / add comments).
-const PRIVILEGED_FIELDS = ['title', 'description', 'priority', 'dueDate', 'assigneeId'] as const;
+const PRIVILEGED_FIELDS = ['title', 'description', 'priority', 'dueDate', 'assigneeId', 'projectId'] as const;
 
 function randomId(): string {
   return Math.random().toString(36).substring(2, 10);
@@ -45,6 +45,22 @@ export const PATCH = requireRole(['user', 'lead', 'admin'], async (req, context)
     }
 
     const body = await req.json().catch(() => ({}));
+
+    // Normalize frontend payload discrepancies
+    if (body.assignedTo !== undefined && body.assigneeId === undefined) {
+      body.assigneeId = body.assignedTo;
+    }
+    if (body.priority !== undefined && typeof body.priority === 'string') {
+      body.priority = body.priority.toLowerCase();
+    }
+    if (body.status !== undefined && typeof body.status === 'string') {
+      const STATUS_MAP: Record<string, string> = {
+        'pending': 'Pending',
+        'in-progress': 'In Progress',
+        'completed': 'Completed'
+      };
+      body.status = STATUS_MAP[body.status.toLowerCase()] || body.status;
+    }
 
     const task = await firestoreAdminGet('tasks', taskId);
     if (!task) {
@@ -143,6 +159,7 @@ export const PATCH = requireRole(['user', 'lead', 'admin'], async (req, context)
         }
         set.assigneeId = body.assigneeId.trim();
       }
+      if (body.projectId !== undefined) set.projectId = body.projectId ? String(body.projectId).trim() : null;
     }
 
     // Require at least one real change (updatedAt alone is not enough).

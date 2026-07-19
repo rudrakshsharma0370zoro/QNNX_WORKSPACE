@@ -55,6 +55,9 @@ export const PATCH = requireRole(['admin', 'lead'], async (req: AuthenticatedReq
       if (body.leadId !== undefined) {
         updates.leadId = body.leadId;
       }
+      if (body.department !== undefined) {
+        updates.department = body.department ? String(body.department).trim() : null;
+      }
     }
 
     // Admins and Leads can change members

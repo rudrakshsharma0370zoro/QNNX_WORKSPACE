@@ -18,7 +18,7 @@ export const runtime = 'edge';
 export const POST = requireRole(['admin'], async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
-    const { name, leadId } = body;
+    const { name, leadId, department } = body;
 
     if (!name || typeof name !== 'string') {
       return NextResponse.json(
@@ -29,6 +29,7 @@ export const POST = requireRole(['admin'], async (req) => {
 
     const newTeam = {
       name: name.trim(),
+      department: department ? String(department).trim() : null,
       leadId: leadId || null,
       members: [],
       createdAt: new Date(),

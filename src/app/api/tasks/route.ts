@@ -23,7 +23,16 @@ type Priority = (typeof VALID_PRIORITIES)[number];
 export const POST = requireRole(['admin', 'lead'], async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
-    const { title, description, assigneeId, priority, dueDate, s3Key } = body;
+
+    // Normalize frontend payload discrepancies
+    if (body.assignedTo !== undefined && body.assigneeId === undefined) {
+      body.assigneeId = body.assignedTo;
+    }
+    if (body.priority !== undefined && typeof body.priority === 'string') {
+      body.priority = body.priority.toLowerCase();
+    }
+
+    const { title, description, assigneeId, priority, dueDate, s3Key, projectId } = body;
 
     // --- Validation ---
     if (!title || typeof title !== 'string' || title.trim() === '') {
@@ -59,6 +68,7 @@ export const POST = requireRole(['admin', 'lead'], async (req) => {
       status: 'Pending',
       priority: (priority as Priority) ?? 'medium',
       dueDate: dueDate ? String(dueDate) : null,
+      projectId: projectId ? String(projectId).trim() : null,
       // Optional pointer to an uploaded attachment in S3.
       s3Key: s3Key ? String(s3Key).trim() : null,
       createdBy: req.user.uid,
