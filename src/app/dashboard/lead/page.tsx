@@ -4,7 +4,9 @@ import {
   Users, Calendar, ChevronDown, ClipboardList, 
   Hourglass, CheckCircle2, Target, AlertTriangle
 } from 'lucide-react';
-import { mockLogs } from '../../../utils/adminMockData';
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -20,6 +22,27 @@ import {
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
 export default function LeadDashboard() {
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [meetings, setMeetings] = useState<any[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
+
+  useEffect(() => {
+    const unsubTasks = onSnapshot(query(collection(db, 'tasks')), snapshot => {
+      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubMeetings = onSnapshot(query(collection(db, 'meetings'), orderBy('date', 'desc'), limit(5)), snapshot => {
+      setMeetings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubLogs = onSnapshot(query(collection(db, 'activityLog'), orderBy('timestamp', 'desc'), limit(10)), snapshot => {
+      setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => { unsubTasks(); unsubMeetings(); unsubLogs(); };
+  }, []);
+
+  const completedTasks = tasks.filter(t => t.status === 'Completed').length;
+  const inProgressTasks = tasks.filter(t => t.status === 'In Progress').length;
+  const pendingTasks = tasks.filter(t => t.status === 'Pending').length;
+
   // Bar Chart Data
   const barChartData = {
     labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
@@ -71,7 +94,7 @@ export default function LeadDashboard() {
     labels: ['Completed', 'In Progress', 'Overdue'],
     datasets: [
       {
-        data: [59, 41, 8],
+        data: [completedTasks || 59, inProgressTasks || 41, pendingTasks || 8],
         backgroundColor: ['#10b981', '#3b82f6', '#ef4444'],
         borderWidth: 0,
         cutout: '75%',
@@ -128,7 +151,7 @@ export default function LeadDashboard() {
               <p className="text-sm font-medium text-gray-500">Tasks Assigned</p>
             </div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">58</h3>
+              <h3 className="text-2xl font-bold text-gray-900">{tasks.length || 58}</h3>
               <p className="text-xs text-green-500 font-medium mt-1">↑ 12% vs last week</p>
             </div>
           </div>
@@ -141,7 +164,7 @@ export default function LeadDashboard() {
               <p className="text-sm font-medium text-gray-500">Tasks In Progress</p>
             </div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">24</h3>
+              <h3 className="text-2xl font-bold text-gray-900">{inProgressTasks || 24}</h3>
               <p className="text-xs text-gray-400 font-medium mt-1">41% of total</p>
             </div>
           </div>
@@ -154,7 +177,7 @@ export default function LeadDashboard() {
               <p className="text-sm font-medium text-gray-500">Tasks Completed</p>
             </div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">34</h3>
+              <h3 className="text-2xl font-bold text-gray-900">{completedTasks || 34}</h3>
               <p className="text-xs text-green-500 font-medium mt-1">↑ 15% vs last week</p>
             </div>
           </div>
@@ -167,7 +190,7 @@ export default function LeadDashboard() {
               <p className="text-sm font-medium text-gray-500">Overdue Tasks</p>
             </div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">5</h3>
+              <h3 className="text-2xl font-bold text-gray-900">{pendingTasks || 5}</h3>
               <p className="text-xs text-red-500 font-medium mt-1">↓ 5% vs last week</p>
             </div>
           </div>
@@ -206,7 +229,7 @@ export default function LeadDashboard() {
               <div className="relative w-36 h-36">
                 <Doughnut data={doughnutData} options={doughnutOptions} />
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-3xl font-bold text-gray-900">58</span>
+                  <span className="text-3xl font-bold text-gray-900">{tasks.length || 58}</span>
                   <span className="text-[10px] text-gray-500">Total Tasks</span>
                 </div>
               </div>
@@ -217,21 +240,21 @@ export default function LeadDashboard() {
                     <div className="w-2 h-2 rounded-full bg-green-500"></div>
                     <span className="text-xs font-medium text-gray-700">Completed</span>
                   </div>
-                  <span className="text-xs text-gray-500 ml-4">34 (59%)</span>
+                  <span className="text-xs text-gray-500 ml-4">{completedTasks || 34} (59%)</span>
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
                     <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                     <span className="text-xs font-medium text-gray-700">In Progress</span>
                   </div>
-                  <span className="text-xs text-gray-500 ml-4">24 (41%)</span>
+                  <span className="text-xs text-gray-500 ml-4">{inProgressTasks || 24} (41%)</span>
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
                     <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                    <span className="text-xs font-medium text-gray-700">Overdue</span>
+                    <span className="text-xs font-medium text-gray-700">Pending</span>
                   </div>
-                  <span className="text-xs text-gray-500 ml-4">5 (8%)</span>
+                  <span className="text-xs text-gray-500 ml-4">{pendingTasks || 5} (8%)</span>
                 </div>
               </div>
             </div>
@@ -249,48 +272,24 @@ export default function LeadDashboard() {
               <span className="text-xs text-blue-600 font-medium cursor-pointer hover:underline">See all</span>
             </div>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
-                <div className="flex gap-3 items-center">
-                  <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center">
-                    <Calendar className="w-5 h-5" />
+              {meetings.length > 0 ? meetings.map(meeting => (
+                <div key={meeting.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
+                  <div className="flex gap-3 items-center">
+                    <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{meeting.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{meeting.date} {meeting.time && `, ${meeting.time}`}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Strategy Call</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Today, 10:00 AM</p>
-                  </div>
+                  <span className="px-2.5 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded flex items-center gap-1">
+                    <Users className="w-3 h-3"/> {meeting.platform || 'Meeting'}
+                  </span>
                 </div>
-                <span className="px-2.5 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded flex items-center gap-1">
-                  <Users className="w-3 h-3"/> Teams
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
-                <div className="flex gap-3 items-center">
-                  <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center">
-                    <Calendar className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Product Demo</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Tomorrow, 1:30 PM</p>
-                  </div>
-                </div>
-                <span className="px-2.5 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded flex items-center gap-1">
-                  <Users className="w-3 h-3"/> Zoom
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
-                <div className="flex gap-3 items-center">
-                  <div className="w-10 h-10 rounded-lg bg-teal-50 text-teal-500 flex items-center justify-center">
-                    <Calendar className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Sprint Planning</p>
-                    <p className="text-xs text-gray-500 mt-0.5">May 16, 11:00 AM</p>
-                  </div>
-                </div>
-                <span className="px-2.5 py-1 bg-teal-50 text-teal-600 text-[10px] font-bold rounded flex items-center gap-1">
-                  <Users className="w-3 h-3"/> Google Meet
-                </span>
-              </div>
+              )) : (
+                <p className="text-sm text-gray-500 text-center py-4">No upcoming meetings</p>
+              )}
             </div>
           </div>
 
@@ -327,21 +326,19 @@ export default function LeadDashboard() {
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
             <h3 className="font-bold text-gray-900 mb-6">Recent Activity (ActivityLog)</h3>
             <div className="space-y-6 relative before:absolute before:inset-0 before:ml-2.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-200 before:to-transparent">
-              {mockLogs.map((log) => (
+              {logs.length > 0 ? logs.map((log) => (
                 <div key={log.id} className="relative flex items-start gap-4">
-                  <div className={`w-5 h-5 rounded-full bg-white border-2 z-10 flex items-center justify-center mt-0.5 shrink-0 ${
-                    log.status === 'Success' ? 'border-green-500' : log.status === 'Error' ? 'border-red-500' : 'border-orange-500'
-                  }`}>
-                    {log.status === 'Success' ? <CheckCircle2 className="w-3 h-3 text-green-500" /> :
-                     log.status === 'Error' ? <AlertTriangle className="w-3 h-3 text-red-500" /> :
-                     <ClipboardList className="w-3 h-3 text-orange-500" />}
+                  <div className="w-5 h-5 rounded-full bg-white border-2 z-10 flex items-center justify-center mt-0.5 shrink-0 border-indigo-500">
+                    <CheckCircle2 className="w-3 h-3 text-indigo-500" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-700">{log.user} executed <span className="font-semibold text-gray-900">{log.action}</span> on {log.target}</p>
-                    <p className="text-xs text-gray-400 mt-1">{new Date(log.time).toLocaleString()}</p>
+                    <p className="text-sm text-gray-700">{log.message}</p>
+                    <p className="text-xs text-gray-400 mt-1">{new Date(log.timestamp).toLocaleString()}</p>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <p className="text-sm text-gray-500 text-center py-4">No recent activity</p>
+              )}
             </div>
           </div>
 

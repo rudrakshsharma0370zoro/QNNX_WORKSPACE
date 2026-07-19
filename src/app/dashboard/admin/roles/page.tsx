@@ -1,19 +1,34 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ShieldCheck, UserCog, User } from 'lucide-react';
-import { mockEmployees, mockLeads } from '../../../../utils/adminMockData';
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query } from 'firebase/firestore';
 
 export default function AdminRolesPermissionsRBAC() {
-  const allUsers = [
-    ...mockLeads.map(l => ({ ...l, role: 'Lead' })),
-    ...mockEmployees
-  ];
+  const [users, setUsers] = useState<any[]>([]);
 
-  const [users, setUsers] = useState(allUsers);
+  useEffect(() => {
+    const q = query(collection(db, 'users'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setUsers(usersData);
+    });
+    return () => unsubscribe();
+  }, []);
 
-  const handleRoleChange = (userId: string, newRole: string) => {
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    // Optimistic update
     setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    try {
+      await fetch(`/api/users/${userId}/role`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole.toLowerCase() }),
+      });
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   return (
@@ -49,8 +64,8 @@ export default function AdminRolesPermissionsRBAC() {
                 <tr key={user.id} className="hover:bg-gray-50/50 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold">
-                        {user.avatar}
+                      <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold uppercase">
+                        {user.name ? user.name.charAt(0) : <User className="w-4 h-4" />}
                       </div>
                       <div>
                         <div className="font-semibold text-gray-900">{user.name}</div>
@@ -67,10 +82,10 @@ export default function AdminRolesPermissionsRBAC() {
                       onChange={(e) => handleRoleChange(user.id, e.target.value)}
                       className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
                     >
-                      <option value="Admin">Admin</option>
-                      <option value="Lead">Lead</option>
-                      <option value="Employee">Employee</option>
-                      <option value="ReadOnly">Read-Only</option>
+                      <option value="admin">Admin</option>
+                      <option value="lead">Lead</option>
+                      <option value="user">Employee (User)</option>
+                      <option value="pending">Pending</option>
                     </select>
                   </td>
                   <td className="px-6 py-4 text-right">

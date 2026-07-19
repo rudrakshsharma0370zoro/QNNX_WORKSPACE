@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helpers ---------------------------------------------------------
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Roles are authoritative in the Firebase custom claim (set by the backend
+    // via /api/users/[id]/role), NOT the users document — so editing your own
+    // users doc can never escalate your privileges here.
+    function roleClaim() {
+      return isAuthenticated() ? request.auth.token.role : '';
+    }
+    function hasRole(role) {
+      return roleClaim() == role;
+    }
+    function isAdmin() { return hasRole('admin'); }
+    function isLead() { return hasRole('lead'); }
+
+    // Confidential document tiers that leads must NOT read.
+    function isConfidentialDoc(cat) {
+      return cat == 'employee-records' || cat == 'company-confidential';
+    }
+
+    // --- Users -----------------------------------------------------------
+    // Reads: admins/leads (team rosters) and each user their own doc.
+    // Writes: a user may create their own doc as role 'user' (signup) and edit
+    // their own doc WITHOUT changing role; role changes happen only via the
+    // backend (Admin SDK, which bypasses these rules). Admins may write freely.
+    match /users/{userId} {
+      allow read: if isAdmin() || isLead() || (isAuthenticated() && request.auth.uid == userId);
+      allow create: if isAuthenticated() && request.auth.uid == userId
+                    && request.resource.data.role == 'pending';
+      allow update: if isAdmin()
+                    || (isAuthenticated() && request.auth.uid == userId
+                        && request.resource.data.role == resource.data.role);
+      allow delete: if isAdmin();
+    }
+
+    // --- Teams -----------------------------------------------------------
+    match /teams/{teamId} {
+      allow read: if isAdmin() || isLead() || (isAuthenticated() && request.auth.uid in resource.data.members);
+      allow write: if false; // managed via backend
+    }
+
+    // --- Projects --------------------------------------------------------
+    match /projects/{projectId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // managed via backend
+    }
+
+    // --- Tasks -----------------------------------------------------------
+    // Reads: admins/leads see all; a user sees tasks assigned to them.
+    // Writes: none from the client — all task writes go through the API.
+    match /tasks/{taskId} {
+      allow read: if isAdmin() || isLead() || (isAuthenticated() && resource.data.assigneeId == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    // --- Meetings --------------------------------------------------------
+    match /meetings/{meetingId} {
+      allow read: if isAdmin() || isLead() || (isAuthenticated() && request.auth.uid in resource.data.participants);
+      allow create, update, delete: if false;
+    }
+
+    // --- Activity Log (shared feed) --------------------------------------
+    // Read by leads/admins; written only by the backend (server activity log).
+    match /activityLog/{logId} {
+      allow read: if isAdmin() || isLead();
+      allow create, update, delete: if false;
+    }
+
+    // --- Documents (metadata; files live in S3) --------------------------
+    // Read policy mirrors the storage category tiers:
+    //   admin: all
+    //   lead : all except the confidential tier
+    //   user : company-wide (policies, resources) + their own task/personal files
+    // Writes: none from the client — recorded via the API.
+    match /documents/{documentId} {
+      allow read: if isAdmin()
+                  || (isLead() && !isConfidentialDoc(resource.data.category))
+                  || (isAuthenticated() && (resource.data.category == 'policies' || resource.data.category == 'resources'))
+                  || (isAuthenticated() && resource.data.addedBy == request.auth.uid
+                      && (resource.data.category == 'task-files' || resource.data.category == 'personal-files'));
+      allow create, update, delete: if false;
+    }
+  }
+}

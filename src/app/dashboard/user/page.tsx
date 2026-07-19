@@ -3,7 +3,10 @@ import {
   CheckCircle2, Clock, Briefcase, 
   Target, ChevronRight
 } from 'lucide-react';
-import { mockProjects, mockTasks } from '../../../utils/adminMockData';
+import { useAuth } from '@/components/AuthProvider';
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
 import { 
   Chart as ChartJS, 
   CategoryScale, 
@@ -19,10 +22,24 @@ import { Bar, Doughnut } from 'react-chartjs-2';
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
 export default function UserOverview() {
-  const CURRENT_USER_ID = 'e1'; // Mock logged-in user (John Doe)
+  const { user: authUser } = useAuth();
+  const CURRENT_USER_ID = authUser?.uid || 'e1'; // Fallback for UI if not fully loaded
 
-  const myProjects = mockProjects.filter(p => p.employeeIds.includes(CURRENT_USER_ID));
-  const myTasks = mockTasks.filter(t => t.assigneeId === CURRENT_USER_ID);
+  const [allProjects, setAllProjects] = useState<any[]>([]);
+  const [allTasks, setAllTasks] = useState<any[]>([]);
+
+  useEffect(() => {
+    const unsubProjects = onSnapshot(query(collection(db, 'projects')), (snapshot) => {
+      setAllProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubTasks = onSnapshot(query(collection(db, 'tasks')), (snapshot) => {
+      setAllTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => { unsubProjects(); unsubTasks(); };
+  }, []);
+
+  const myProjects = allProjects.filter(p => p.employeeIds && p.employeeIds.includes(CURRENT_USER_ID));
+  const myTasks = allTasks.filter(t => t.assigneeId === CURRENT_USER_ID);
   
   const completedTasks = myTasks.filter(t => t.status === 'Completed').length;
   const inProgressTasks = myTasks.filter(t => t.status === 'In Progress').length;
@@ -92,7 +109,7 @@ export default function UserOverview() {
         
         {/* Header */}
         <div className="mb-8">
-          <h2 className="text-[22px] font-bold text-[#111827]">Good Morning, John</h2>
+          <h2 className="text-[22px] font-bold text-[#111827]">Good Morning, {authUser?.displayName || authUser?.email?.split('@')[0] || 'User'}</h2>
           <p className="text-[13px] text-gray-500 mt-1">Here is the overview of your workday and pending assignments.</p>
         </div>
 

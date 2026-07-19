@@ -1,11 +1,42 @@
 "use client";
-import { useState } from 'react';
-import { mockTeams, mockLeads } from '../../../../utils/adminMockData';
+import { useState, useEffect } from 'react';
+import { mockLeads } from '../../../../utils/adminMockData';
 import { Users, Plus, Edit2, Trash2, X } from 'lucide-react';
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query } from 'firebase/firestore';
 
 export default function AdminTeams() {
-  const [teams, setTeams] = useState(mockTeams);
+  const [teams, setTeams] = useState<any[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newTeam, setNewTeam] = useState({ name: '', department: '', leadId: '' });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const q = query(collection(db, 'teams'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const teamsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setTeams(teamsData);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleCreateTeam = async () => {
+    if (!newTeam.name || !newTeam.department) return;
+    setLoading(true);
+    try {
+      await fetch('/api/teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTeam),
+      });
+      setIsAddModalOpen(false);
+      setNewTeam({ name: '', department: '', leadId: '' });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="font-sans text-gray-800 bg-[#F8FAFC] p-6 lg:p-8 min-h-full w-full relative">
@@ -67,9 +98,9 @@ export default function AdminTeams() {
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className={`px-2.5 py-1 text-[11px] font-bold rounded border ${
-                        team.status === 'Active' ? 'text-green-700 bg-green-50 border-green-200' : 'text-gray-600 bg-gray-50 border-gray-200'
+                        team.status === 'Active' || !team.status ? 'text-green-700 bg-green-50 border-green-200' : 'text-gray-600 bg-gray-50 border-gray-200'
                       }`}>
-                        {team.status.toUpperCase()}
+                        {(team.status || 'Active').toUpperCase()}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -99,15 +130,16 @@ export default function AdminTeams() {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Team Name</label>
-                <input type="text" placeholder="e.g. Core Product Design" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
+                <input type="text" value={newTeam.name} onChange={e => setNewTeam({...newTeam, name: e.target.value})} placeholder="e.g. Core Product Design" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Department</label>
-                <input type="text" placeholder="e.g. Design" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
+                <input type="text" value={newTeam.department} onChange={e => setNewTeam({...newTeam, department: e.target.value})} placeholder="e.g. Design" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Assign Lead</label>
-                <select className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                <select value={newTeam.leadId} onChange={e => setNewTeam({...newTeam, leadId: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                  <option value="">Select Lead</option>
                   {mockLeads.map(l => (
                     <option key={l.id} value={l.id}>{l.name} - {l.department}</option>
                   ))}
@@ -116,7 +148,7 @@ export default function AdminTeams() {
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
               <button onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-              <button onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700">Create Team</button>
+              <button onClick={handleCreateTeam} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700">Create Team</button>
             </div>
           </div>
         </div>

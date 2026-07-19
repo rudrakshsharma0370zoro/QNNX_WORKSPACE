@@ -16,7 +16,9 @@ import {
   Legend,
   ArcElement
 } from 'chart.js';
-import { mockProjects, mockLeads, mockEmployees } from '../../../utils/adminMockData';
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query } from 'firebase/firestore';
+import { useEffect } from 'react';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
@@ -26,6 +28,22 @@ export default function AdminOverview() {
   
   const [selectedMonth, setSelectedMonth] = useState('This Month');
   const [selectedYear, setSelectedYear] = useState('2026');
+  
+  const [projects, setProjects] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    const unsubProjects = onSnapshot(query(collection(db, 'projects')), (snapshot) => {
+      setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubUsers = onSnapshot(query(collection(db, 'users')), (snapshot) => {
+      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => { unsubProjects(); unsubUsers(); };
+  }, []);
+
+  const totalLeads = users.filter(u => u.role === 'lead').length;
+  const totalEmployees = users.filter(u => u.role === 'user').length;
 
   // Bar Chart Data: Projects timeline mock
   const barChartData = {
@@ -33,7 +51,7 @@ export default function AdminOverview() {
     datasets: [
       {
         label: 'Projects Started',
-        data: [2, 3, 5, 4, 6, 8, mockProjects.length],
+        data: [2, 3, 5, 4, 6, 8, projects.length],
         backgroundColor: '#3b82f6',
         borderRadius: 4,
         barPercentage: 0.5,
@@ -71,8 +89,8 @@ export default function AdminOverview() {
     },
   };
 
-  const inProgressProjects = mockProjects.filter(p => p.status === 'In Progress').length;
-  const completedProjects = mockProjects.filter(p => p.status === 'Completed').length;
+  const inProgressProjects = projects.filter(p => p.status === 'In Progress').length;
+  const completedProjects = projects.filter(p => p.status === 'Completed').length;
 
   // Doughnut Chart Data
   const doughnutData = {
@@ -143,7 +161,7 @@ export default function AdminOverview() {
               </div>
             </div>
             <div>
-              <h3 className="text-3xl font-bold text-gray-900">{mockProjects.length}</h3>
+              <h3 className="text-3xl font-bold text-gray-900">{projects.length}</h3>
               <p className="text-xs text-gray-500 mt-1">{inProgressProjects} active right now</p>
             </div>
           </div>
@@ -158,7 +176,7 @@ export default function AdminOverview() {
               </div>
             </div>
             <div>
-              <h3 className="text-3xl font-bold text-gray-900">{mockLeads.length}</h3>
+              <h3 className="text-3xl font-bold text-gray-900">{totalLeads}</h3>
               <p className="text-xs text-gray-500 mt-1">Across all departments</p>
             </div>
           </div>
@@ -173,7 +191,7 @@ export default function AdminOverview() {
               </div>
             </div>
             <div>
-              <h3 className="text-3xl font-bold text-gray-900">{mockEmployees.length}</h3>
+              <h3 className="text-3xl font-bold text-gray-900">{totalEmployees}</h3>
               <p className="text-xs text-gray-500 mt-1">Growing steadily</p>
             </div>
           </div>
@@ -232,7 +250,7 @@ export default function AdminOverview() {
               <div className="relative w-36 h-36">
                 <Doughnut data={doughnutData} options={doughnutOptions} />
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-3xl font-bold text-gray-900">{mockProjects.length}</span>
+                  <span className="text-3xl font-bold text-gray-900">{projects.length}</span>
                   <span className="text-[10px] text-gray-500">Total</span>
                 </div>
               </div>
