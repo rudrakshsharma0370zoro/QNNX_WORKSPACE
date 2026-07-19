@@ -10,8 +10,10 @@ service cloud.firestore {
     // Roles are authoritative in the Firebase custom claim (set by the backend
     // via /api/users/[id]/role), NOT the users document — so editing your own
     // users doc can never escalate your privileges here.
+    // `.get()` with a default keeps this safe for users who have no claim yet
+    // (e.g. brand-new signups still on the pending list).
     function roleClaim() {
-      return isAuthenticated() ? request.auth.token.role : '';
+      return isAuthenticated() ? request.auth.token.get('role', '') : '';
     }
     function hasRole(role) {
       return roleClaim() == role;
@@ -25,23 +27,40 @@ service cloud.firestore {
     }
 
     // --- Users -----------------------------------------------------------
-    // Reads: admins/leads (team rosters) and each user their own doc.
-    // Writes: a user may create their own doc as role 'user' (signup) and edit
-    // their own doc WITHOUT changing role; role changes happen only via the
-    // backend (Admin SDK, which bypasses these rules). Admins may write freely.
+    // This document is the shared profile: name, email, role. It is readable by
+    // any signed-in user so the app can render rosters, assignee names and the
+    // lead list. That is only safe because it holds NO sensitive data —
+    // phone / address / ssn live in the private subcollection below.
+    // Rules cannot hide individual fields, so the split is what enforces this.
+    //
+    // Writes: a user may create their own doc as role 'pending' (signup) and
+    // edit their own doc WITHOUT changing role; role changes happen only via
+    // the backend service account, which bypasses these rules entirely.
     match /users/{userId} {
-      allow read: if isAdmin() || isLead() || (isAuthenticated() && request.auth.uid == userId);
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated() && request.auth.uid == userId
                     && request.resource.data.role == 'pending';
+      // `.get()` on BOTH sides: a partial update that omits `role` must be
+      // evaluated normally, not rejected with an error.
       allow update: if isAdmin()
                     || (isAuthenticated() && request.auth.uid == userId
-                        && request.resource.data.role == resource.data.role);
+                        && request.resource.data.get('role', '') == resource.data.get('role', ''));
       allow delete: if isAdmin();
+
+      // --- Private PII (phone, address, ssn) ------------------------------
+      // Written exclusively by the backend (PATCH /api/users/[id]), which uses
+      // the service account and bypasses these rules. Clients may only READ,
+      // and only their own document — admins may read anyone's.
+      match /private/{docId} {
+        allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+        allow write: if false;
+      }
     }
 
     // --- Teams -----------------------------------------------------------
     match /teams/{teamId} {
-      allow read: if isAdmin() || isLead() || (isAuthenticated() && request.auth.uid in resource.data.members);
+      allow read: if isAdmin() || isLead()
+                  || (isAuthenticated() && request.auth.uid in resource.data.get('members', []));
       allow write: if false; // managed via backend
     }
 
@@ -53,15 +72,22 @@ service cloud.firestore {
 
     // --- Tasks -----------------------------------------------------------
     // Reads: admins/leads see all; a user sees tasks assigned to them.
+    // A non-admin/non-lead client MUST constrain the query:
+    //   query(collection(db,'tasks'), where('assigneeId','==',uid))
+    // An unfiltered list is rejected outright — rules filter queries, not rows.
     // Writes: none from the client — all task writes go through the API.
     match /tasks/{taskId} {
-      allow read: if isAdmin() || isLead() || (isAuthenticated() && resource.data.assigneeId == request.auth.uid);
+      allow read: if isAdmin() || isLead()
+                  || (isAuthenticated() && resource.data.get('assigneeId', '') == request.auth.uid);
       allow create, update, delete: if false;
     }
 
     // --- Meetings --------------------------------------------------------
+    // Same query constraint as tasks:
+    //   where('participants','array-contains',uid)
     match /meetings/{meetingId} {
-      allow read: if isAdmin() || isLead() || (isAuthenticated() && request.auth.uid in resource.data.participants);
+      allow read: if isAdmin() || isLead()
+                  || (isAuthenticated() && request.auth.uid in resource.data.get('participants', []));
       allow create, update, delete: if false;
     }
 
@@ -80,10 +106,14 @@ service cloud.firestore {
     // Writes: none from the client — recorded via the API.
     match /documents/{documentId} {
       allow read: if isAdmin()
-                  || (isLead() && !isConfidentialDoc(resource.data.category))
-                  || (isAuthenticated() && (resource.data.category == 'policies' || resource.data.category == 'resources'))
-                  || (isAuthenticated() && resource.data.addedBy == request.auth.uid
-                      && (resource.data.category == 'task-files' || resource.data.category == 'personal-files'));
+                  || (isLead() && !isConfidentialDoc(resource.data.get('category', '')))
+                  || (isAuthenticated()
+                      && (resource.data.get('category', '') == 'policies'
+                          || resource.data.get('category', '') == 'resources'))
+                  || (isAuthenticated()
+                      && resource.data.get('addedBy', '') == request.auth.uid
+                      && (resource.data.get('category', '') == 'task-files'
+                          || resource.data.get('category', '') == 'personal-files'));
       allow create, update, delete: if false;
     }
   }

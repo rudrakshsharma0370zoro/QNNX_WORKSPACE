@@ -1,12 +1,27 @@
 "use client";
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { mockProjects, mockLeads } from '../../../../utils/adminMockData';
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { useAuth } from '@/components/AuthProvider';
 import { Briefcase, ChevronRight } from 'lucide-react';
 
 export default function UserProjects() {
-  const CURRENT_USER_ID = 'e1';
-  const [projects] = useState(mockProjects.filter(p => p.employeeIds.includes(CURRENT_USER_ID)));
+  const { user } = useAuth();
+  const [projects, setProjects] = useState<any[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsubProjects = onSnapshot(query(collection(db, 'projects')), (snapshot) => {
+      const allProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setProjects(allProjects.filter((p: any) => p.employeeIds?.includes(user.uid)));
+    });
+    const unsubLeads = onSnapshot(query(collection(db, 'users'), where('role', '==', 'lead')), snapshot => {
+      setLeads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => { unsubProjects(); unsubLeads(); };
+  }, [user?.uid]);
 
   return (
     <div className="font-sans text-gray-800 bg-[#F8FAFC] p-6 lg:p-8 min-h-full w-full">
@@ -19,7 +34,7 @@ export default function UserProjects() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {projects.map(project => {
-            const lead = mockLeads.find(l => l.id === project.leadId);
+            const lead = leads.find(l => l.id === project.leadId);
             
             return (
               <Link href={`/dashboard/user/projects/${project.id}`} key={project.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:border-indigo-300 transition-colors cursor-pointer group flex flex-col justify-between h-48 block">
@@ -40,10 +55,10 @@ export default function UserProjects() {
 
                 <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-600">
-                      {lead?.avatar}
+                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-600 uppercase">
+                      {lead?.name ? lead.name.charAt(0) : '?'}
                     </div>
-                    <span className="text-[11px] font-medium text-gray-500">Lead: {lead?.name}</span>
+                    <span className="text-[11px] font-medium text-gray-500">Lead: {lead?.name || lead?.email}</span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-500 transition-colors" />
                 </div>

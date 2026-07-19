@@ -1,15 +1,36 @@
 "use client";
 import { useParams, useRouter } from 'next/navigation';
-import { mockEmployees, mockTasks } from '../../../../../utils/adminMockData';
+import { useEffect, useState } from 'react';
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query, where, doc } from 'firebase/firestore';
 import { ArrowLeft, Mail, Briefcase, CheckSquare, Clock } from 'lucide-react';
 
 export default function AdminEmployeeProfile() {
   const params = useParams();
   const router = useRouter();
   const employeeId = params.id as string;
-  
-  const employee = mockEmployees.find(e => e.id === employeeId);
-  const employeeTasks = mockTasks.filter(t => t.assigneeId === employeeId);
+  const [employee, setEmployee] = useState<any>(null);
+  const [employeeTasks, setEmployeeTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubUser = onSnapshot(doc(db, 'users', employeeId), snapshot => {
+      if (snapshot.exists()) {
+        setEmployee({ id: snapshot.id, ...snapshot.data() });
+      } else {
+        setEmployee(null);
+      }
+      setLoading(false);
+    });
+    const unsubTasks = onSnapshot(query(collection(db, 'tasks'), where('assigneeId', '==', employeeId)), snapshot => {
+      setEmployeeTasks(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => { unsubUser(); unsubTasks(); };
+  }, [employeeId]);
+
+  if (loading) {
+    return <div className="p-8 text-center text-gray-500">Loading...</div>;
+  }
 
   if (!employee) {
     return (
@@ -34,8 +55,8 @@ export default function AdminEmployeeProfile() {
         {/* Profile Header */}
         <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm mt-4 flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <div className="w-24 h-24 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-3xl font-bold">
-              {employee.avatar}
+            <div className="w-24 h-24 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-3xl font-bold uppercase">
+              {employee.name ? employee.name.charAt(0) : '?'}
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900">{employee.name}</h2>

@@ -67,7 +67,9 @@ async function assignRole(req: NextRequest, context: RouteContext): Promise<Resp
             email: info?.email || '',
             role,
             createdAt: new Date(),
-            personalDetails: {},
+            // PII intentionally omitted: sensitive fields live in the private
+            // subcollection users/{uid}/private/details, never in this doc,
+            // which is readable by any signed-in user.
           },
           uid
         );

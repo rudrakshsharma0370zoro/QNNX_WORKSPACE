@@ -1,10 +1,25 @@
 "use client";
-import { useState } from 'react';
-import { mockTasks, mockProjects } from '../../../../utils/adminMockData';
+import { useEffect, useState } from 'react';
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { useAuth } from '@/components/AuthProvider';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 export default function UserTasks() {
-  const CURRENT_USER_ID = 'e1';
-  const [tasks, setTasks] = useState(mockTasks.filter(t => t.assigneeId === CURRENT_USER_ID));
+  const { user } = useAuth();
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsubTasks = onSnapshot(query(collection(db, 'tasks'), where('assigneeId', '==', user.uid)), snapshot => {
+      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubProjects = onSnapshot(query(collection(db, 'projects')), snapshot => {
+      setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => { unsubTasks(); unsubProjects(); };
+  }, [user?.uid]);
 
   const getPriorityColor = (priority: string) => {
     switch(priority) {
@@ -24,8 +39,15 @@ export default function UserTasks() {
     }
   };
 
-  const updateTaskStatus = (id: string, newStatus: string) => {
+  const updateTaskStatus = async (id: string, newStatus: string) => {
+    // Optimistic update
     setTasks(tasks.map(t => t.id === id ? { ...t, status: newStatus } : t));
+    try {
+      await fetchWithAuth(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus }),
+      });
+    } catch (e) { console.error(e); }
   };
 
   return (
@@ -49,7 +71,7 @@ export default function UserTasks() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {tasks.map((task) => {
-                const project = mockProjects.find(p => p.id === task.projectId);
+                const project = projects.find(p => p.id === task.projectId);
 
                 return (
                   <tr key={task.id} className="hover:bg-indigo-50/30 transition-colors group">

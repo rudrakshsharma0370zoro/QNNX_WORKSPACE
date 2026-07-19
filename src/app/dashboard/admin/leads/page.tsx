@@ -1,13 +1,26 @@
 "use client";
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { mockLeads, mockProjects } from '../../../../utils/adminMockData';
+import { useEffect } from 'react';
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { Users, Plus, Search, Edit2, Trash2, Mail, X } from 'lucide-react';
 
 export default function AdminLeads() {
   const router = useRouter();
-  const [leads, setLeads] = useState(mockLeads);
+  const [leads, setLeads] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  useEffect(() => {
+    const unsubLeads = onSnapshot(query(collection(db, 'users'), where('role', '==', 'lead')), snapshot => {
+      setLeads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubProjects = onSnapshot(query(collection(db, 'projects')), snapshot => {
+      setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => { unsubLeads(); unsubProjects(); };
+  }, []);
 
   return (
     <div className="font-sans text-gray-800 bg-gray-50/30 p-6 lg:p-8 min-h-full w-full relative">
@@ -50,7 +63,7 @@ export default function AdminLeads() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {leads.map((lead) => {
-                  const leadProjects = mockProjects.filter(p => p.leadId === lead.id);
+                  const leadProjects = projects.filter(p => p.leadId === lead.id);
                   
                   return (
                     <tr 
@@ -60,8 +73,8 @@ export default function AdminLeads() {
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-lg font-bold shrink-0">
-                            {lead.avatar}
+                          <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-lg font-bold shrink-0 uppercase">
+                            {lead.name ? lead.name.charAt(0) : '?'}
                           </div>
                           <div>
                             <div className="font-semibold text-gray-900 text-base group-hover:text-indigo-600 transition-colors">{lead.name}</div>

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { db } from '@/lib/firebaseClient';
-import { collection, onSnapshot, query } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { useState, useEffect } from 'react';
 import { 
   Chart as ChartJS, 
@@ -23,23 +23,36 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
 
 export default function UserOverview() {
   const { user: authUser } = useAuth();
-  const CURRENT_USER_ID = authUser?.uid || 'e1'; // Fallback for UI if not fully loaded
+  const CURRENT_USER_ID = authUser?.uid ?? null;
 
   const [allProjects, setAllProjects] = useState<any[]>([]);
   const [allTasks, setAllTasks] = useState<any[]>([]);
 
   useEffect(() => {
+    // Wait for the uid: the tasks query below is filtered by it, and Firestore
+    // rules reject the query outright without that filter.
+    if (!CURRENT_USER_ID) return;
+
     const unsubProjects = onSnapshot(query(collection(db, 'projects')), (snapshot) => {
       setAllProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    const unsubTasks = onSnapshot(query(collection(db, 'tasks')), (snapshot) => {
-      setAllTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+
+    // Must be filtered by assigneeId. Firestore rules constrain *queries*, not
+    // rows: a plain user listing all tasks is denied entirely, so filtering in
+    // memory afterwards would return nothing.
+    const unsubTasks = onSnapshot(
+      query(collection(db, 'tasks'), where('assigneeId', '==', CURRENT_USER_ID)),
+      (snapshot) => {
+        setAllTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }
+    );
+
     return () => { unsubProjects(); unsubTasks(); };
-  }, []);
+  }, [CURRENT_USER_ID]);
 
   const myProjects = allProjects.filter(p => p.employeeIds && p.employeeIds.includes(CURRENT_USER_ID));
-  const myTasks = allTasks.filter(t => t.assigneeId === CURRENT_USER_ID);
+  // Already scoped to this user by the query above.
+  const myTasks = allTasks;
   
   const completedTasks = myTasks.filter(t => t.status === 'Completed').length;
   const inProgressTasks = myTasks.filter(t => t.status === 'In Progress').length;

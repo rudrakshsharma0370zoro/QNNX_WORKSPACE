@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { mockLeads } from '../../../../utils/adminMockData';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { Briefcase, ChevronRight, Filter, Plus, Edit2, Trash2, X } from 'lucide-react';
@@ -8,6 +8,7 @@ import Link from 'next/link';
 
 export default function AdminProjects() {
   const [projects, setProjects] = useState<any[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', deadline: '', status: 'In Progress', leadId: '' });
   const [loading, setLoading] = useState(false);
@@ -16,16 +17,19 @@ export default function AdminProjects() {
     const unsubProjects = onSnapshot(query(collection(db, 'projects')), snapshot => {
       setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => unsubProjects();
+    const unsubLeads = onSnapshot(query(collection(db, 'users')), snapshot => {
+      const allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setLeads(allUsers.filter((u: any) => u.role === 'lead'));
+    });
+    return () => { unsubProjects(); unsubLeads(); };
   }, []);
 
   const handleCreateProject = async () => {
     if (!newProject.name) return;
     setLoading(true);
     try {
-      await fetch('/api/projects', {
+      await fetchWithAuth('/api/projects', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newProject),
       });
       setIsAddModalOpen(false);
@@ -39,7 +43,7 @@ export default function AdminProjects() {
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this project?')) {
-      await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+      await fetchWithAuth(`/api/projects/${id}`, { method: 'DELETE' });
     }
   };
 
@@ -67,7 +71,7 @@ export default function AdminProjects() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {projects.map((project) => {
-            const lead = mockLeads.find(l => l.id === project.leadId);
+            const lead = leads.find(l => l.id === project.leadId);
             
             return (
               <div key={project.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:border-indigo-300 transition-all hover:shadow-md group flex flex-col justify-between h-52 relative">
@@ -89,7 +93,7 @@ export default function AdminProjects() {
                 <div className="pt-4 border-t border-gray-100 mt-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-600">
-                      {lead?.avatar}
+                      {lead?.name ? lead.name.charAt(0).toUpperCase() : '?'}
                     </div>
                     <span className="text-[11px] font-semibold text-gray-600 truncate max-w-[100px]">{lead?.name}</span>
                   </div>
@@ -147,8 +151,8 @@ export default function AdminProjects() {
                 <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Assign Lead</label>
                 <select value={newProject.leadId} onChange={e => setNewProject({...newProject, leadId: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700">
                   <option value="">Select Lead</option>
-                  {mockLeads.map(l => (
-                    <option key={l.id} value={l.id}>{l.name} - {l.department}</option>
+                  {leads.map(l => (
+                    <option key={l.id} value={l.id}>{l.name} - {l.email}</option>
                   ))}
                 </select>
               </div>

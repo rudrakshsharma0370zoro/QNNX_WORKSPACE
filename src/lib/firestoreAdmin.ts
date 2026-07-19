@@ -151,6 +151,56 @@ export async function firestoreAdminUpdate(
   }
 }
 
+/**
+ * Upsert: merges fields into a document, creating it when it does not exist.
+ *
+ * Identical to `firestoreAdminUpdate` except that it omits the
+ * `currentDocument.exists=true` precondition, so the first write succeeds
+ * instead of throwing NOT_FOUND. Use this where the document is created lazily
+ * on first write — e.g. the private profile doc at
+ * `users/{uid}/private/details`, which does not exist until a user first saves
+ * their personal information.
+ *
+ * `path` is a full document path relative to the database root, so
+ * subcollections are supported: `users/abc123/private`.
+ *
+ * @param path - Collection path (may be nested, e.g. 'users/{uid}/private')
+ * @param documentId - The ID of the target document
+ * @param data - Key-value pairs of fields to merge
+ */
+export async function firestoreAdminSet(
+  path: string,
+  documentId: string,
+  data: Record<string, unknown>
+): Promise<void> {
+  const token = await getGoogleAccessToken(GoogleScopes.DATASTORE);
+
+  // Only the listed fields are touched; any field omitted here is preserved.
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) {
+      params.append('updateMask.fieldPaths', key);
+    }
+  }
+
+  const response = await fetch(
+    `${documentsUrl(`${path}/${documentId}`)}?${params.toString()}`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ fields: toFields(data) }),
+    }
+  );
+
+  const resData = await response.json();
+  if (!response.ok) {
+    throw new Error(resData.error?.message || 'Firestore REST upsert failed.');
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Reading (Firestore REST value -> JS)
 // ---------------------------------------------------------------------------
@@ -297,4 +347,34 @@ export async function firestoreAdminDelete(
     const resData = await response.json().catch(() => ({}));
     throw new Error(resData.error?.message || 'Firestore REST delete failed.');
   }
+}
+
+/**
+ * Fetches all documents in a collection.
+ */
+export async function firestoreAdminList(
+  collection: string
+): Promise<Record<string, unknown>[]> {
+  const token = await getGoogleAccessToken(GoogleScopes.DATASTORE);
+
+  const response = await fetch(documentsUrl(collection), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (response.status === 404) return [];
+
+  const resData = await response.json();
+  if (!response.ok) {
+    throw new Error(resData.error?.message || 'Firestore REST list failed.');
+  }
+
+  const documents = resData.documents || [];
+  return documents.map((doc: any) => {
+    const parts = doc.name.split('/');
+    const id = parts[parts.length - 1];
+    return {
+      id,
+      ...fromFirestoreFields(doc.fields || {}),
+    };
+  });
 }

@@ -1,11 +1,21 @@
 "use client";
 import { useState } from 'react';
-import { mockMeetings } from '../../../../utils/adminMockData';
+import { useEffect } from 'react';
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { X, Plus, Video, Users, Calendar, Clock } from 'lucide-react';
 
 export default function AdminMeetings() {
-  const [meetings] = useState(mockMeetings);
+  const [meetings, setMeetings] = useState<any[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  useEffect(() => {
+    const q = query(collection(db, 'meetings'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setMeetings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleJoin = (platform: string) => {
     // Simulate joining a meeting by opening a generic video URL

@@ -1,15 +1,40 @@
 "use client";
 import { useParams, useRouter } from 'next/navigation';
-import { mockLeads, mockProjects, mockTasks } from '../../../../../utils/adminMockData';
+import { useEffect, useState } from 'react';
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query, where, doc } from 'firebase/firestore';
 import { ArrowLeft, Mail, Briefcase, Network } from 'lucide-react';
 
 export default function AdminLeadProfile() {
   const params = useParams();
   const router = useRouter();
   const leadId = params.id as string;
-  
-  const lead = mockLeads.find(l => l.id === leadId);
-  const leadProjects = mockProjects.filter(p => p.leadId === leadId);
+  const [lead, setLead] = useState<any>(null);
+  const [leadProjects, setLeadProjects] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubLead = onSnapshot(doc(db, 'users', leadId), snapshot => {
+      if (snapshot.exists()) {
+        setLead({ id: snapshot.id, ...snapshot.data() });
+      } else {
+        setLead(null);
+      }
+      setLoading(false);
+    });
+    const unsubProjects = onSnapshot(query(collection(db, 'projects'), where('leadId', '==', leadId)), snapshot => {
+      setLeadProjects(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    const unsubTasks = onSnapshot(query(collection(db, 'tasks')), snapshot => {
+      setTasks(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => { unsubLead(); unsubProjects(); unsubTasks(); };
+  }, [leadId]);
+
+  if (loading) {
+    return <div className="p-8 text-center text-gray-500">Loading...</div>;
+  }
 
   if (!lead) {
     return (
@@ -30,8 +55,8 @@ export default function AdminLeadProfile() {
         {/* Profile Header */}
         <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm mt-4 flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <div className="w-24 h-24 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-3xl font-bold">
-              {lead.avatar}
+            <div className="w-24 h-24 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-3xl font-bold uppercase">
+              {lead.name ? lead.name.charAt(0) : '?'}
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900">{lead.name}</h2>
@@ -73,7 +98,7 @@ export default function AdminLeadProfile() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {leadProjects.map((project) => {
-                const projectTasks = mockTasks.filter(t => t.projectId === project.id);
+                const projectTasks = tasks.filter(t => t.projectId === project.id);
                 const completedTasks = projectTasks.filter(t => t.status === 'Completed').length;
                 const progress = projectTasks.length === 0 ? 0 : Math.round((completedTasks / projectTasks.length) * 100);
                 
@@ -85,7 +110,7 @@ export default function AdminLeadProfile() {
                     </td>
                     <td className="px-5 py-4 text-center">
                       <div className="flex justify-center -space-x-2">
-                        {project.employeeIds.map((id, idx) => (
+                        {project.employeeIds?.map((id: string, idx: number) => (
                           <div key={idx} className="w-6 h-6 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center text-[9px] font-bold text-gray-600">
                             E
                           </div>

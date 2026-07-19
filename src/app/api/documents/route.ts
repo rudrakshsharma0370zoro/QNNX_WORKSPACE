@@ -5,6 +5,7 @@ import { logActivityServer } from '@/lib/activityLog';
 import {
   isStorageCategory,
   canUploadToCategory,
+  canReadCategory,
   STORAGE_CATEGORIES,
 } from '@/lib/storageCategories';
 
@@ -81,3 +82,38 @@ export const POST = requireRole([], async (req) => {
     );
   }
 });
+
+export const GET = requireRole([], async (req) => {
+  try {
+    const { firestoreAdminList } = await import('@/lib/firestoreAdmin');
+    const documents = await firestoreAdminList('documents');
+
+    // This route reads with the service account, which bypasses
+    // firestore.rules — so the per-category read policy MUST be re-applied
+    // here. Without it, any signed-in user would receive employee-records and
+    // company-confidential metadata. Mirrors the `documents` rule exactly.
+    const role = req.user.role || 'user';
+    const visible = (documents as any[]).filter((d) => {
+      const category = typeof d?.category === 'string' ? d.category : '';
+      if (!isStorageCategory(category)) return false;
+      return canReadCategory(role, category, { isOwner: d?.addedBy === req.user.uid });
+    });
+
+    // Sort documents by addedAt descending
+    visible.sort((a: any, b: any) => {
+      const dateA = new Date(a.addedAt || 0).getTime();
+      const dateB = new Date(b.addedAt || 0).getTime();
+      return dateB - dateA;
+    });
+
+    return NextResponse.json({ success: true, documents: visible }, { status: 200 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Operation failed.';
+    console.error('[API Documents] Get Error:', error);
+    return NextResponse.json(
+      { error: 'Internal Server Error', details: message },
+      { status: 500 }
+    );
+  }
+});
+

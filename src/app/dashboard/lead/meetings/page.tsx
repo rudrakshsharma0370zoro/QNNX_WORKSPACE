@@ -1,7 +1,9 @@
+"use client";
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Users, Video, Plus, MoreVertical } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 export default function MeetingsPage() {
   const [meetings, setMeetings] = useState<any[]>([]);
@@ -22,9 +24,8 @@ export default function MeetingsPage() {
     if (!newMeeting.title) return;
     setLoading(true);
     try {
-      await fetch('/api/meetings', {
+      await fetchWithAuth('/api/meetings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...newMeeting, participants: [] }),
       });
       setIsAddModalOpen(false);

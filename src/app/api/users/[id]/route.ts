@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireRole, RouteContext, AuthenticatedRequest } from '@/lib/auth';
-import { firestoreAdminUpdate } from '@/lib/firestoreAdmin';
+import { firestoreAdminUpdate, firestoreAdminSet } from '@/lib/firestoreAdmin';
 
 // Explicitly define edge execution for Cloudflare compatibility
 export const runtime = 'edge';
@@ -13,11 +13,26 @@ export const runtime = 'edge';
  * role changes go exclusively through POST /api/users/[id]/role, and email is
  * tied to the Firebase Auth account, so both are rejected here.
  *
+ * STORAGE SPLIT — this is deliberate and security-relevant:
+ *   users/{uid}                  public-ish profile (name, email, role).
+ *                                Readable by any signed-in user so the app can
+ *                                render rosters, assignee names and lead lists.
+ *   users/{uid}/private/details  sensitive PII (phone, address, ssn).
+ *                                Readable only by the owner and admins.
+ *
+ * Firestore rules cannot hide individual fields — a document is readable or it
+ * is not. Keeping PII in a separate document is what makes the parent profile
+ * safe to expose.
+ *
  * Body: {
  *   name?: string,
  *   personalDetails?: { phone?: string, address?: string, ssn?: string }
  * }
  */
+
+/** Subcollection path holding a user's private PII document. */
+const PRIVATE_DETAILS_DOC = 'details';
+const privatePath = (uid: string) => `users/${uid}/private`;
 
 const MAX_FIELD_LENGTH = 500;
 
@@ -72,7 +87,10 @@ async function updateProfile(
       );
     }
 
+    // Fields written to the public-ish users/{uid} document.
     const updates: Record<string, unknown> = {};
+    // Fields written to the private users/{uid}/private/details document.
+    let privateDetails: Record<string, string> | null = null;
 
     if (body.name !== undefined) {
       const name = asTrimmedString(body.name, 'name');
@@ -100,20 +118,37 @@ async function updateProfile(
           details[key] = asTrimmedString(pd[key], `personalDetails.${key}`);
         }
       }
-      updates.personalDetails = details;
+      privateDetails = details;
     }
 
-    if (Object.keys(updates).length === 0) {
+    if (Object.keys(updates).length === 0 && privateDetails === null) {
       return NextResponse.json(
         { error: 'Bad Request', details: 'No editable fields provided (name, personalDetails).' },
         { status: 400 }
       );
     }
 
-    updates.updatedAt = new Date();
-    await firestoreAdminUpdate('users', uid, updates);
+    const updated: string[] = [];
 
-    return NextResponse.json({ success: true, uid, updated: Object.keys(updates) });
+    // PII goes to the private subcollection, never the shared profile doc.
+    // Upsert, because the private doc is created lazily on first save.
+    if (privateDetails !== null) {
+      await firestoreAdminSet(privatePath(uid), PRIVATE_DETAILS_DOC, {
+        ...privateDetails,
+        updatedAt: new Date(),
+      });
+      updated.push('personalDetails');
+    }
+
+    // The parent profile doc is only touched when a public field changed, so a
+    // PII-only save cannot fail on a user whose profile doc is missing.
+    if (Object.keys(updates).length > 0) {
+      updates.updatedAt = new Date();
+      await firestoreAdminUpdate('users', uid, updates);
+      updated.push(...Object.keys(updates));
+    }
+
+    return NextResponse.json({ success: true, uid, updated });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Operation failed.';
     console.error('[API Users] Profile update error:', error);

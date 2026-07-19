@@ -1,7 +1,8 @@
 "use client";
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/components/AuthProvider';
 import { 
   LayoutDashboard, Briefcase, CheckSquare, CalendarDays, FolderOpen,
   Search, Bell, Settings, LogOut, X, User as UserIcon
@@ -9,7 +10,15 @@ import {
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, role, loading, logout } = useAuth();
   
+  useEffect(() => {
+    if (!loading && (!user || role !== 'user')) {
+      router.push('/');
+    }
+  }, [user, role, loading, router]);
+
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -27,6 +36,14 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
     { name: 'Meetings', href: '/dashboard/user/meetings', icon: CalendarDays },
     { name: 'Documents', href: '/dashboard/user/documents', icon: FolderOpen },
   ];
+
+  if (loading || !user || role !== 'user') {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#F8FAFC]">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] relative">
@@ -53,7 +70,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
         </nav>
 
         <div className="p-4 border-t border-gray-200">
-          <button className="flex items-center gap-3 px-3 py-2.5 w-full text-[13px] font-medium text-red-600 rounded-lg hover:bg-red-50 transition-colors">
+          <button onClick={() => logout()} className="flex items-center gap-3 px-3 py-2.5 w-full text-[13px] font-medium text-red-600 rounded-lg hover:bg-red-50 transition-colors">
             <LogOut className="w-[18px] h-[18px]" /> Sign Out
           </button>
         </div>

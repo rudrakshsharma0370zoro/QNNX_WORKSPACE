@@ -1,16 +1,58 @@
 "use client";
 import { useParams } from 'next/navigation';
-import { mockProjects, mockTasks, mockLeads } from '../../../../../utils/adminMockData';
+import { useEffect, useState } from 'react';
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query, where, doc } from 'firebase/firestore';
 import { ArrowLeft, CheckSquare, Clock } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function UserProjectDetail() {
   const params = useParams();
   const projectId = params.id as string;
-  
-  const project = mockProjects.find(p => p.id === projectId);
-  const lead = mockLeads.find(l => l.id === project?.leadId);
-  const projectTasks = mockTasks.filter(t => t.projectId === projectId);
+  const { user } = useAuth();
+  const [project, setProject] = useState<any>(null);
+  const [lead, setLead] = useState<any>(null);
+  const [projectTasks, setProjectTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubProject = onSnapshot(doc(db, 'projects', projectId), snapshot => {
+      if (snapshot.exists()) {
+        const projData = { id: snapshot.id, ...snapshot.data() } as any;
+        setProject(projData);
+        // Fetch lead once we know the project's leadId
+        if (projData.leadId) {
+          const unsubLead = onSnapshot(doc(db, 'users', projData.leadId), leadSnap => {
+            if (leadSnap.exists()) setLead({ id: leadSnap.id, ...leadSnap.data() });
+          });
+        }
+      } else {
+        setProject(null);
+      }
+      setLoading(false);
+    });
+    // Both filters are required: `projectId` scopes the view, and `assigneeId`
+    // is what the Firestore rule authorizes a plain user against. Filtering on
+    // projectId alone would be rejected for non-admin/non-lead accounts.
+    // Two equality filters need no composite index.
+    const unsubTasks = user?.uid
+      ? onSnapshot(
+          query(
+            collection(db, 'tasks'),
+            where('projectId', '==', projectId),
+            where('assigneeId', '==', user.uid)
+          ),
+          snapshot => {
+            setProjectTasks(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+          }
+        )
+      : null;
+
+    return () => { unsubProject(); if (unsubTasks) unsubTasks(); };
+  }, [projectId, user?.uid]);
+
+  if (loading) return <div className="p-8 text-center text-gray-500">Loading...</div>;
 
   if (!project) {
     return (
@@ -51,10 +93,10 @@ export default function UserProjectDetail() {
             <div>
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Lead</p>
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold">
-                  {lead?.avatar}
+                <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold uppercase">
+                  {lead?.name ? lead.name.charAt(0) : '?'}
                 </div>
-                <span className="text-[13px] font-medium text-gray-700">{lead?.name}</span>
+                <span className="text-[13px] font-medium text-gray-700">{lead?.name || lead?.email}</span>
               </div>
             </div>
             <div>

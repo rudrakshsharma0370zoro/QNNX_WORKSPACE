@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { ShieldCheck, UserCog, User } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 export default function AdminRolesPermissionsRBAC() {
   const [users, setUsers] = useState<any[]>([]);
@@ -21,9 +22,8 @@ export default function AdminRolesPermissionsRBAC() {
     // Optimistic update
     setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
     try {
-      await fetch(`/api/users/${userId}/role`, {
+      await fetchWithAuth(`/api/users/${userId}/role`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole.toLowerCase() }),
       });
     } catch (error) {

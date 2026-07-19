@@ -1,11 +1,36 @@
 "use client";
-import { useState } from 'react';
-import { mockMeetings } from '../../../../utils/adminMockData';
+import React, { useState, useEffect } from 'react';
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function UserMeetings() {
-  const CURRENT_USER_ID = 'e1';
-  // Filter meetings where current user is an attendee
-  const [meetings] = useState(mockMeetings.filter(m => m.attendees.includes(CURRENT_USER_ID)));
+  const { user } = useAuth();
+  const [meetings, setMeetings] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    // The backend stores the attendee list as `participants` (not `attendees`),
+    // and Firestore rules require a non-privileged client to filter by it —
+    // an unfiltered meetings query is rejected outright for a plain user.
+    //
+    // No orderBy here on purpose: combining array-contains with orderBy would
+    // require a composite index. Sorting a user's own meetings in memory is
+    // cheap and keeps the deployment index-free.
+    const q = query(
+      collection(db, 'meetings'),
+      where('participants', 'array-contains', user.uid)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const mine = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+      mine.sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
+      setMeetings(mine);
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid]);
 
   const handleJoin = (title: string) => {
     alert(`Joining ${title} in a new tab...`);

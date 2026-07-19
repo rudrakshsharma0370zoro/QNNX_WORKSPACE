@@ -1,32 +1,35 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { mockLeads } from '../../../../utils/adminMockData';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { Users, Plus, Edit2, Trash2, X } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 
 export default function AdminTeams() {
   const [teams, setTeams] = useState<any[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newTeam, setNewTeam] = useState({ name: '', department: '', leadId: '' });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, 'teams'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubTeams = onSnapshot(query(collection(db, 'teams')), (snapshot) => {
       const teamsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTeams(teamsData);
     });
-    return () => unsubscribe();
+    const unsubLeads = onSnapshot(query(collection(db, 'users')), snapshot => {
+      const allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setLeads(allUsers.filter((u: any) => u.role === 'lead'));
+    });
+    return () => { unsubTeams(); unsubLeads(); };
   }, []);
 
   const handleCreateTeam = async () => {
     if (!newTeam.name || !newTeam.department) return;
     setLoading(true);
     try {
-      await fetch('/api/teams', {
+      await fetchWithAuth('/api/teams', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newTeam),
       });
       setIsAddModalOpen(false);
@@ -69,7 +72,7 @@ export default function AdminTeams() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {teams.map((team) => {
-                const lead = mockLeads.find(l => l.id === team.leadId);
+                const lead = leads.find(l => l.id === team.leadId);
                 
                 return (
                   <tr key={team.id} className="hover:bg-gray-50/50 transition-colors">
@@ -85,9 +88,9 @@ export default function AdminTeams() {
                       {lead ? (
                         <div className="flex items-center gap-2 text-sm text-gray-700">
                           <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">
-                            {lead.avatar}
+                            {lead?.name ? lead.name.charAt(0).toUpperCase() : '?'}
                           </div>
-                          {lead.name}
+                          {lead.name || lead.email}
                         </div>
                       ) : (
                         <span className="text-gray-400 italic text-xs">Unassigned</span>
@@ -140,8 +143,8 @@ export default function AdminTeams() {
                 <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Assign Lead</label>
                 <select value={newTeam.leadId} onChange={e => setNewTeam({...newTeam, leadId: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
                   <option value="">Select Lead</option>
-                  {mockLeads.map(l => (
-                    <option key={l.id} value={l.id}>{l.name} - {l.department}</option>
+                  {leads.map(l => (
+                    <option key={l.id} value={l.id}>{l.name} - {l.email}</option>
                   ))}
                 </select>
               </div>

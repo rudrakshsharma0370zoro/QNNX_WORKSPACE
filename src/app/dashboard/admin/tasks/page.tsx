@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Edit2, Trash2, X, Plus } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 export default function AdminTasks() {
   const [tasks, setTasks] = useState<any[]>([]);
@@ -54,9 +55,8 @@ export default function AdminTasks() {
     };
     const nextStatus = statusMap[currentStatus] || 'pending';
     try {
-      await fetch(`/api/tasks/${id}`, {
+      await fetchWithAuth(`/api/tasks/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nextStatus }),
       });
     } catch(e) { console.error(e); }
@@ -66,15 +66,14 @@ export default function AdminTasks() {
     if (!newTask.title) return;
     setLoading(true);
     try {
-      await fetch('/api/tasks', {
+      await fetchWithAuth('/api/tasks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newTask.title,
           assignedTo: newTask.assigneeId,
           priority: newTask.priority.toLowerCase(),
           // Passing projectId if we want to save it as part of description or add it to API
-          description: `Project ID: ${newTask.projectId}`,
+          projectId: newTask.projectId,
         }),
       });
       setIsAddModalOpen(false);
@@ -85,7 +84,7 @@ export default function AdminTasks() {
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this task?')) {
-      await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+      await fetchWithAuth(`/api/tasks/${id}`, { method: 'DELETE' });
     }
   };
 
@@ -133,9 +132,9 @@ export default function AdminTasks() {
                       {assignee ? (
                         <div className="flex items-center justify-center gap-2">
                           <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600">
-                            {assignee.avatar}
+                            {assignee?.name ? assignee.name.charAt(0).toUpperCase() : '?'}
                           </div>
-                          <span className="text-[13px] text-gray-600 font-medium">{assignee.name}</span>
+                          <span className="text-[13px] text-gray-600 font-medium">{assignee.name || assignee.email}</span>
                         </div>
                       ) : (
                         <span className="text-[13px] text-gray-400 italic">Unassigned</span>

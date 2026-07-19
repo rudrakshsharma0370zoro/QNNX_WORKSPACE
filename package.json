@@ -1,7 +1,9 @@
 {
   "dependencies": {
+    "aws4fetch": "^1.0.20",
     "chart.js": "^4.5.1",
     "firebase": "^12.16.0",
+    "jose": "^6.2.3",
     "lucide-react": "^1.24.0",
     "next": "^16.2.10",
     "react": "^19.2.7",
@@ -28,6 +30,6 @@
     "autoprefixer": "^10.5.3",
     "postcss": "^8.5.19",
     "tailwindcss": "^4.3.2",
-    "typescript": "7.0.2"
+    "typescript": "^5.5.4"
   }
 }

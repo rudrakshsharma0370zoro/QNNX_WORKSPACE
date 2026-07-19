@@ -1,11 +1,29 @@
 "use client";
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { useAuth } from '@/components/AuthProvider';
 import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Bell, Settings, LogOut } from 'lucide-react';
 
 export default function LeadLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, role, loading, logout } = useAuth();
   
+  useEffect(() => {
+    if (!loading && (!user || role !== 'lead')) {
+      router.push('/');
+    }
+  }, [user, role, loading, router]);
+
+  if (loading || !user || role !== 'lead') {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#F8FAFC]">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
   const navItems = [
     { name: 'Dashboard', href: '/dashboard/lead', icon: LayoutDashboard },
     { name: 'Team', href: '/dashboard/lead/team', icon: Users },
@@ -39,10 +57,10 @@ export default function LeadLayout({ children }: { children: React.ReactNode }) 
         </nav>
 
         <div className="p-4 border-t border-gray-200 space-y-1">
-          <button className="flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50">
+          <Link href="/dashboard/lead/settings" className="flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50">
             <Settings className="w-5 h-5" /> Settings
-          </button>
-          <button className="flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50">
+          </Link>
+          <button onClick={() => logout()} className="flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 transition-colors">
             <LogOut className="w-5 h-5" /> Sign Out
           </button>
         </div>

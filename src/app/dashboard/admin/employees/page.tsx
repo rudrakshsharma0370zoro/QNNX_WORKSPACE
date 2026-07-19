@@ -1,13 +1,26 @@
 "use client";
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { mockEmployees, mockTasks } from '../../../../utils/adminMockData';
+import { useEffect } from 'react';
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { X } from 'lucide-react';
 
 export default function AdminEmployees() {
   const router = useRouter();
-  const [employees, setEmployees] = useState(mockEmployees);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  useEffect(() => {
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), where('role', '==', 'user')), snapshot => {
+      setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubTasks = onSnapshot(query(collection(db, 'tasks')), snapshot => {
+      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => { unsubUsers(); unsubTasks(); };
+  }, []);
 
   return (
     <div className="font-sans text-gray-800 bg-[#F8FAFC] p-6 lg:p-8 min-h-full w-full relative">
@@ -38,7 +51,7 @@ export default function AdminEmployees() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {employees.map((employee, idx) => {
-                const activeTasks = mockTasks.filter(t => t.assigneeId === employee.id && t.status !== 'Completed').length;
+                const activeTasks = tasks.filter(t => t.assigneeId === employee.id && t.status !== 'Completed').length;
                 const workload = activeTasks * 15; // Mock calculation
                 
                 const getWorkloadColor = (val: number) => {
@@ -64,7 +77,7 @@ export default function AdminEmployees() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${avatarColor}`}>
-                          {employee.avatar}
+                          {employee.name ? employee.name.charAt(0).toUpperCase() : '?'}
                         </div>
                         <div>
                           <div className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">{employee.name}</div>

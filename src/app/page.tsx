@@ -41,12 +41,14 @@ export default function Home() {
         // New signups land on the approval waiting list (role "pending"); an
         // admin assigns the real role via the backend. This matches the
         // Firestore rule that only allows creating your own doc as "pending".
+        // Only non-sensitive profile fields go here — users/{uid} is readable
+        // by any signed-in user. PII (phone/address/ssn) is written separately
+        // to users/{uid}/private/details by PATCH /api/users/[id].
         await setDoc(doc(db, "users", cred.user.uid), {
           name: fullName || "New User",
           email: cred.user.email,
           role: "pending",
           createdAt: new Date().toISOString(),
-          personalDetails: {},
         });
       } else {
         await signInWithEmailAndPassword(auth, email, password);
