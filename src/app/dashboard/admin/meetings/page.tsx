@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { newJitsiLink, joinUrl } from '@/utils/meeting';
+import { newJitsiLink, joinUrl, isUpcoming } from '@/utils/meeting';
 import { useAuth } from '@/components/AuthProvider';
 import { X, Plus, Video, Users, Calendar, Clock, Zap } from 'lucide-react';
 
@@ -144,8 +144,8 @@ export default function AdminMeetings() {
     window.open(joinUrl(meeting), '_blank');
   };
 
-  const upcoming = meetings.filter(m => new Date(m.date) >= new Date());
-  const past = meetings.filter(m => new Date(m.date) < new Date());
+  const upcoming = meetings.filter(m => isUpcoming(m.date));
+  const past = meetings.filter(m => !isUpcoming(m.date));
 
   return (
     <div className="font-sans text-gray-800 bg-[#F8FAFC] p-6 lg:p-8 min-h-full w-full relative">

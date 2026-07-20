@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { isUpcoming } from '@/utils/meeting';
 import {
   LayoutDashboard, Briefcase, CheckSquare, CalendarDays, FolderOpen,
   Search, Bell, Settings, LogOut, X, User as UserIcon
@@ -52,7 +53,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
       const mine = snapshot.docs
         .map(d => ({ id: d.id, ...d.data() })) as any[];
       const upcoming = mine
-        .filter(m => new Date(m.date) >= new Date())
+        .filter(m => isUpcoming(m.date))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
         .slice(0, 5);
       setUpcomingMeetings(upcoming);

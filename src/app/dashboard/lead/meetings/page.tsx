@@ -4,7 +4,7 @@ import { Calendar, Clock, Users, Video, Plus, MoreVertical, Zap } from 'lucide-r
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { newJitsiLink, joinUrl } from '@/utils/meeting';
+import { newJitsiLink, joinUrl, isUpcoming } from '@/utils/meeting';
 import { useAuth } from '@/components/AuthProvider';
 
 interface Meeting {
@@ -131,8 +131,8 @@ export default function MeetingsPage() {
     window.open(joinUrl(meeting), '_blank');
   };
 
-  const upcomingMeetings = meetings.filter(m => new Date(m.date) >= new Date());
-  const pastMeetings = meetings.filter(m => new Date(m.date) < new Date());
+  const upcomingMeetings = meetings.filter(m => isUpcoming(m.date));
+  const pastMeetings = meetings.filter(m => !isUpcoming(m.date));
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">

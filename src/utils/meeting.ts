@@ -24,3 +24,14 @@ export function newJitsiLink(): string {
 export function joinUrl(meeting: { id: string; link?: string | null }): string {
   return meeting.link || `https://meet.jit.si/QNNX-${meeting.id}`;
 }
+
+/**
+ * Determines if a meeting should be shown in the "Upcoming" list.
+ * Any meeting scheduled for today or in the future is considered upcoming.
+ */
+export function isUpcoming(dateStr: string): boolean {
+  const d = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return d >= today;
+}
