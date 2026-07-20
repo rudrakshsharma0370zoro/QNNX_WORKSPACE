@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { useAuth } from '@/components/AuthProvider';
+import { joinUrl } from '@/utils/meeting';
 
 export default function UserMeetings() {
   const { user } = useAuth();
@@ -36,7 +37,10 @@ export default function UserMeetings() {
     // Prefer the real link the organizer set; fall back to a fresh Meet room
     // only when none was provided (no real video-conferencing API is wired
     // up yet, so this fallback stays a placeholder).
-    window.open(meeting.link || 'https://meet.google.com/new', '_blank');
+    // window.open(meeting.link || 'https://meet.google.com/new', '_blank');
+    // Jitsi fix: joinUrl() falls back to a room named after the meeting id,
+    // so even link-less meetings put every joiner in the SAME room.
+    window.open(joinUrl(meeting), '_blank');
   };
 
   return (

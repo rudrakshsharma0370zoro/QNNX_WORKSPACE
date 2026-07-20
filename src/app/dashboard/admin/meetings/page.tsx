@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { newJitsiLink, joinUrl } from '@/utils/meeting';
 import { useAuth } from '@/components/AuthProvider';
 import { X, Plus, Video, Users, Calendar, Clock, Zap } from 'lucide-react';
 
@@ -95,7 +96,7 @@ export default function AdminMeetings() {
     }
   };
 
-  // Creates and immediately opens an ad-hoc meeting with no scheduling step —
+  // Creates and immediately opens an ad-hoc meeting with no scheduling step
   // the moment you click, a meeting is written to Firestore, everyone
   // currently on this page's team list is invited, and the call opens.
   const handleStartInstantMeeting = async () => {
@@ -104,16 +105,21 @@ export default function AdminMeetings() {
     try {
       const now = new Date();
       const organizerName = user?.displayName || user?.email || 'Someone';
+      // Jitsi fix: mint ONE room link up front, store it on the meeting, and
+      // open that same link — organizer and every joiner share a single room.
+      const link = newJitsiLink();
       const res = await fetchWithAuth('/api/meetings', {
         method: 'POST',
         body: JSON.stringify({
           title: `Instant Meeting — started by ${organizerName}`,
           date: now.toISOString(),
           time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          platform: 'Google Meet',
-          // No real video-conferencing API is integrated yet, so a fresh Meet
-          // room is generated the same way the "Join" buttons already do.
-          link: 'https://meet.google.com/new',
+          // platform: 'Google Meet',
+          platform: 'Jitsi Meet',
+          // Old approach — meet.google.com/new creates a DIFFERENT room for
+          // every person who opens it, so attendees never met each other:
+          // link: 'https://meet.google.com/new',
+          link,
           participants: allUsers.filter(u => u.id !== user?.uid).map(u => u.id),
           type: 'instant',
         }),
@@ -122,7 +128,8 @@ export default function AdminMeetings() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.details || body.error || 'Failed to start meeting.');
       }
-      window.open('https://meet.google.com/new', '_blank');
+      // window.open('https://meet.google.com/new', '_blank');
+      window.open(link, '_blank');
     } catch (e: any) {
       setError(e.message || 'Failed to start instant meeting.');
     } finally {
@@ -131,7 +138,10 @@ export default function AdminMeetings() {
   };
 
   const handleJoin = (meeting: Meeting) => {
-    window.open(meeting.link || 'https://meet.google.com/new', '_blank');
+    // window.open(meeting.link || 'https://meet.google.com/new', '_blank');
+    // Jitsi fix: joinUrl() falls back to a room named after the meeting id,
+    // so even link-less meetings put every joiner in the SAME room.
+    window.open(joinUrl(meeting), '_blank');
   };
 
   const upcoming = meetings.filter(m => new Date(m.date) >= new Date());
