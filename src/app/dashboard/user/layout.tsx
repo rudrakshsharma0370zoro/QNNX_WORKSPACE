@@ -3,7 +3,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { 
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import {
   LayoutDashboard, Briefcase, CheckSquare, CalendarDays, FolderOpen,
   Search, Bell, Settings, LogOut, X, User as UserIcon
 } from 'lucide-react';
@@ -11,8 +13,8 @@ import {
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, role, loading, logout } = useAuth();
-  
+  const { user, role, profile, loading, logout } = useAuth();
+
   useEffect(() => {
     if (!loading && (!user || role !== 'user')) {
       router.push('/');
@@ -22,12 +24,41 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  
-  const [profileData, setProfileData] = useState({
-    name: 'John Doe',
-    role: 'UI/UX Designer',
-    email: 'john.doe@qnnx.com'
-  });
+
+  // Draft state for the Edit Profile modal, seeded from the real signed-in
+  // profile once it loads (replaces the previous hardcoded "John Doe").
+  const [profileData, setProfileData] = useState({ name: '', role: 'Employee', email: '' });
+
+  useEffect(() => {
+    if (profile) {
+      setProfileData(prev => ({ ...prev, name: profile.name, email: profile.email }));
+    }
+  }, [profile]);
+
+  const displayName = profile?.name || user?.email || 'User';
+
+  // Real "notification" content: this user's own upcoming meetings. There is
+  // no dedicated per-user notifications collection yet — activityLog is
+  // admin/lead only by design (firestore.rules) — so meetings the user is
+  // actually invited to is the honest, currently-available substitute for
+  // what used to be two hardcoded fake cards ("New Task Assigned",
+  // "Sprint Planning starts in 15 minutes").
+  const [upcomingMeetings, setUpcomingMeetings] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const q = query(collection(db, 'meetings'), where('participants', 'array-contains', user.uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const mine = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() })) as any[];
+      const upcoming = mine
+        .filter(m => new Date(m.date) >= new Date())
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(0, 5);
+      setUpcomingMeetings(upcoming);
+    });
+    return () => unsubscribe();
+  }, [user?.uid]);
 
   const navItems = [
     { name: 'Dashboard', href: '/dashboard/user', icon: LayoutDashboard },
@@ -118,18 +149,26 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
                 {isNotifOpen && (
                   <div className="absolute right-0 mt-3 w-72 bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
                     <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center">
-                      <span className="text-sm font-bold text-gray-900">Notifications</span>
-                      <span className="text-[11px] text-indigo-600 cursor-pointer">Mark all read</span>
+                      <span className="text-sm font-bold text-gray-900">Upcoming Meetings</span>
                     </div>
                     <div className="max-h-64 overflow-y-auto">
-                      <div className="px-4 py-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer">
-                        <p className="text-[12px] font-semibold text-gray-900">New Task Assigned</p>
-                        <p className="text-[11px] text-gray-500 mt-0.5">Alex Lead assigned you to "Design Wireframes"</p>
-                      </div>
-                      <div className="px-4 py-3 hover:bg-gray-50 cursor-pointer">
-                        <p className="text-[12px] font-semibold text-gray-900">Meeting Reminder</p>
-                        <p className="text-[11px] text-gray-500 mt-0.5">Sprint Planning starts in 15 minutes.</p>
-                      </div>
+                      {upcomingMeetings.length === 0 ? (
+                        <p className="px-4 py-6 text-[12px] text-gray-500 text-center">No notifications yet.</p>
+                      ) : (
+                        upcomingMeetings.map((m) => (
+                          <Link
+                            key={m.id}
+                            href="/dashboard/user/meetings"
+                            onClick={() => setIsNotifOpen(false)}
+                            className="block px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 cursor-pointer"
+                          >
+                            <p className="text-[12px] font-semibold text-gray-900">{m.title}</p>
+                            <p className="text-[11px] text-gray-500 mt-0.5">
+                              {new Date(m.date).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </Link>
+                        ))
+                      )}
                     </div>
                   </div>
                 )}
@@ -142,11 +181,11 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
               className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
             >
               <div className="text-right">
-                <p className="text-[13px] font-semibold text-gray-900">{profileData.name}</p>
+                <p className="text-[13px] font-semibold text-gray-900">{displayName}</p>
                 <p className="text-[11px] text-gray-500">{profileData.role}</p>
               </div>
               <div className="w-9 h-9 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-sm">
-                {profileData.name.charAt(0)}
+                {displayName.charAt(0).toUpperCase()}
               </div>
             </div>
           </div>

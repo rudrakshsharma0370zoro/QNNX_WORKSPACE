@@ -9,7 +9,12 @@ export default function AdminNotificationsCenter() {
   const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
-    const q = query(collection(db, 'activityLog'), orderBy('timestamp', 'desc'), limit(20));
+    // The backend (logActivityServer) writes each entry with a `createdAt`
+    // field, not `timestamp`. Firestore's orderBy excludes any document that
+    // lacks the ordered field entirely, so querying by `timestamp` here
+    // silently returned zero results — every real activity log entry was
+    // filtered out before it ever reached this page.
+    const q = query(collection(db, 'activityLog'), orderBy('createdAt', 'desc'), limit(20));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setNotifications(notifs);
@@ -50,7 +55,7 @@ export default function AdminNotificationsCenter() {
                     <h4 className="font-semibold text-gray-900">{notif.message}</h4>
                     <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
                       <Clock className="w-3.5 h-3.5" />
-                      {new Date(notif.timestamp).toLocaleString()}
+                      {new Date(notif.createdAt).toLocaleString()}
                     </div>
                   </div>
                 </div>

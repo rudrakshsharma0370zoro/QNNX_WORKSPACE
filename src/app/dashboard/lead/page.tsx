@@ -33,7 +33,9 @@ export default function LeadDashboard() {
     const unsubMeetings = onSnapshot(query(collection(db, 'meetings'), orderBy('date', 'desc'), limit(5)), snapshot => {
       setMeetings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    const unsubLogs = onSnapshot(query(collection(db, 'activityLog'), orderBy('timestamp', 'desc'), limit(10)), snapshot => {
+    // The backend writes each entry with `createdAt`, not `timestamp` —
+    // ordering by the wrong field silently excludes every real document.
+    const unsubLogs = onSnapshot(query(collection(db, 'activityLog'), orderBy('createdAt', 'desc'), limit(10)), snapshot => {
       setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => { unsubTasks(); unsubMeetings(); unsubLogs(); };
@@ -333,7 +335,7 @@ export default function LeadDashboard() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-700">{log.message}</p>
-                    <p className="text-xs text-gray-400 mt-1">{new Date(log.timestamp).toLocaleString()}</p>
+                    <p className="text-xs text-gray-400 mt-1">{new Date(log.createdAt).toLocaleString()}</p>
                   </div>
                 </div>
               )) : (

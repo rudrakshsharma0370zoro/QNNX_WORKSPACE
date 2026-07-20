@@ -86,6 +86,40 @@ export async function getUploadPresignedUrl(
 }
 
 /**
+ * Permanently deletes an object from the bucket.
+ *
+ * Uses `AwsClient.fetch()` (rather than `.sign()` + a manual fetch) so the
+ * signed DELETE request is made directly by the server — no presigned URL is
+ * handed to the client, since this is always an admin-initiated action.
+ * S3 returns 204 No Content for both a successful delete and a delete of a
+ * key that never existed, so a missing object is treated as success
+ * (idempotent, matches `firestoreAdminDelete`'s behavior for 404s).
+ *
+ * @param key - The object key to remove from the bucket
+ */
+export async function deleteObjectFromS3(key: string): Promise<void> {
+  if (!AWS_S3_BUCKET_NAME) {
+    throw new Error(
+      'Configuration Error: AWS_S3_BUCKET_NAME environment variable is not defined.'
+    );
+  }
+
+  const endpoint = `https://${AWS_S3_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${key}`;
+
+  try {
+    const response = await getAwsClient().fetch(endpoint, { method: 'DELETE' });
+    if (!response.ok && response.status !== 404) {
+      const body = await response.text().catch(() => '');
+      throw new Error(`S3 responded ${response.status}: ${body || 'delete failed'}`);
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[S3 Subsystem] Error deleting object:', message);
+    throw new Error(`S3 Delete Failure: ${message}`);
+  }
+}
+
+/**
  * Generates a presigned GET URL for downloading a private object.
  * Kept short-lived since it is minted on demand for immediate viewing.
  *

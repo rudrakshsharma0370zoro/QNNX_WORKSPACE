@@ -1,9 +1,18 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
-import { Filter, Search, CloudUpload, FileText, FileSpreadsheet, Image as ImageIcon, Lock, Download, Loader2 } from 'lucide-react';
+import { Filter, Search, CloudUpload, FileText, FileSpreadsheet, Image as ImageIcon, Lock, Download, Loader2, Trash2 } from 'lucide-react';
 import { auth } from '@/config/firebaseConfig';
+import { useAuth } from '@/components/AuthProvider';
+
+// Only these categories are ever owner-deletable by a plain user — matches
+// the OWNER_CATEGORIES check in DELETE /api/documents/[id]. Company-wide
+// docs (policies, resources) that a user can merely read are not theirs to
+// remove, so the delete button is hidden for those instead of always
+// showing a button that would 403.
+const OWNER_DELETABLE_CATEGORIES = ['task-files', 'personal-files'];
 
 export default function UserDocuments() {
+  const { user } = useAuth();
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -129,6 +138,25 @@ export default function UserDocuments() {
     }
   };
 
+  const canDelete = (doc: any) =>
+    doc.addedBy === user?.uid && OWNER_DELETABLE_CATEGORIES.includes(doc.category);
+
+  const handleDelete = async (doc: any) => {
+    if (!confirm(`Delete "${doc.title}"? This permanently removes it from S3.`)) return;
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/documents/${doc.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.details || 'Delete failed');
+      setDocuments(prev => prev.filter(d => d.id !== doc.id));
+    } catch (err: any) {
+      alert(err.message || 'Delete failed');
+    }
+  };
+
   const getFileIcon = (filename: string) => {
     const ext = filename.split('.').pop()?.toLowerCase();
     if (['pdf', 'doc', 'docx', 'txt'].includes(ext || '')) return <FileText className="w-5 h-5 text-blue-500" />;
@@ -222,7 +250,15 @@ export default function UserDocuments() {
                           >
                             <Download className="w-4 h-4" />
                           </button>
-                          <button className="p-1.5 hover:text-gray-900 transition-colors">•••</button>
+                          {canDelete(doc) && (
+                            <button
+                              onClick={() => handleDelete(doc)}
+                              className="p-1.5 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Delete from S3"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

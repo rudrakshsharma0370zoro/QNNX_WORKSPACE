@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Bell, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Bell, Settings, LogOut, Briefcase } from 'lucide-react';
 
 export default function LeadLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -26,6 +26,7 @@ export default function LeadLayout({ children }: { children: React.ReactNode }) 
 
   const navItems = [
     { name: 'Dashboard', href: '/dashboard/lead', icon: LayoutDashboard },
+    { name: 'Projects', href: '/dashboard/lead/projects', icon: Briefcase },
     { name: 'Team', href: '/dashboard/lead/team', icon: Users },
     { name: 'Tasks', href: '/dashboard/lead/tasks', icon: CheckSquare },
     { name: 'Meetings', href: '/dashboard/lead/meetings', icon: Calendar },

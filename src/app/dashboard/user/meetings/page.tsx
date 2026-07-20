@@ -32,9 +32,11 @@ export default function UserMeetings() {
     return () => unsubscribe();
   }, [user?.uid]);
 
-  const handleJoin = (title: string) => {
-    alert(`Joining ${title} in a new tab...`);
-    window.open('https://meet.google.com/new', '_blank');
+  const handleJoin = (meeting: any) => {
+    // Prefer the real link the organizer set; fall back to a fresh Meet room
+    // only when none was provided (no real video-conferencing API is wired
+    // up yet, so this fallback stays a placeholder).
+    window.open(meeting.link || 'https://meet.google.com/new', '_blank');
   };
 
   return (
@@ -58,23 +60,25 @@ export default function UserMeetings() {
                 <div>
                   <h4 className="font-bold text-gray-900">{meeting.title}</h4>
                   <span className="inline-block mt-1 px-2 py-0.5 text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded uppercase">
-                    {meeting.type}
+                    {meeting.type === 'instant' ? 'Instant' : 'Scheduled'}
                   </span>
-                  
+
                   <div className="mt-4 space-y-2 text-[13px] text-gray-500">
                     <div className="flex items-center gap-2">
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> 
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                       {new Date(meeting.date).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </div>
                     <div className="flex items-center gap-2">
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> 
-                      {meeting.attendees.length} Attendees
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                      {/* Backend field is `participants`, not `attendees` — reading
+                          the wrong field crashed this page on every real meeting. */}
+                      {meeting.participants?.length ?? 0} Attendees
                     </div>
                   </div>
                 </div>
                 <div className="mt-6 flex justify-end">
-                  <button 
-                    onClick={() => handleJoin(meeting.title)}
+                  <button
+                    onClick={() => handleJoin(meeting)}
                     className="px-5 py-1.5 bg-[#4F46E5] text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
                   >
                     Join Call

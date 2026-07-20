@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
-import { Filter, Search, CloudUpload, FileText, FileSpreadsheet, Image as ImageIcon, Lock, Download, Loader2 } from 'lucide-react';
+import { Filter, Search, CloudUpload, FileText, FileSpreadsheet, Image as ImageIcon, Lock, Download, Loader2, Trash2 } from 'lucide-react';
 import { auth } from '@/config/firebaseConfig';
 
 export default function LeadDocuments() {
@@ -133,6 +133,25 @@ export default function LeadDocuments() {
     }
   };
 
+  // Leads can delete any document except the confidential tier — but the
+  // confidential tier never reaches this page (GET /api/documents already
+  // filters it out for a lead), so any doc rendered here is deletable.
+  const handleDelete = async (doc: any) => {
+    if (!confirm(`Delete "${doc.title}"? This permanently removes it from S3.`)) return;
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/documents/${doc.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.details || 'Delete failed');
+      setDocuments(prev => prev.filter(d => d.id !== doc.id));
+    } catch (err: any) {
+      alert(err.message || 'Delete failed');
+    }
+  };
+
   const getFileIcon = (filename: string) => {
     const ext = filename.split('.').pop()?.toLowerCase();
     if (['pdf', 'doc', 'docx', 'txt'].includes(ext || '')) return <FileText className="w-5 h-5 text-blue-500" />;
@@ -226,7 +245,13 @@ export default function LeadDocuments() {
                           >
                             <Download className="w-4 h-4" />
                           </button>
-                          <button className="p-1.5 hover:text-gray-900 transition-colors">•••</button>
+                          <button
+                            onClick={() => handleDelete(doc)}
+                            className="p-1.5 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Delete from S3"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>

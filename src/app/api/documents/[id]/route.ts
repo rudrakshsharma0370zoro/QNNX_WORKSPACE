@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireRole } from '@/lib/auth';
 import { firestoreAdminGet, firestoreAdminDelete } from '@/lib/firestoreAdmin';
 import { logActivityServer } from '@/lib/activityLog';
+import { deleteObjectFromS3 } from '@/lib/s3';
 
 // Explicitly define edge execution for Cloudflare compatibility
 export const runtime = 'edge';
@@ -51,6 +52,20 @@ export const DELETE = requireRole(['user', 'lead', 'admin'], async (req, context
         { error: 'Forbidden', details: 'You are not permitted to delete this document.' },
         { status: 403 }
       );
+    }
+
+    // Remove the actual file from S3 before dropping the metadata record.
+    // Best-effort: link-only documents have no s3Key, and a failure here
+    // (bucket hiccup, already-gone object) must not block cleanup of the
+    // Firestore record — an orphaned S3 object is recoverable, a document
+    // the user can no longer delete is not.
+    const s3Key = typeof document.s3Key === 'string' ? document.s3Key : null;
+    if (s3Key) {
+      try {
+        await deleteObjectFromS3(s3Key);
+      } catch (s3Error) {
+        console.error('[API Document Delete] S3 object delete failed:', s3Error);
+      }
     }
 
     await firestoreAdminDelete('documents', documentId);

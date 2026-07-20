@@ -6,16 +6,21 @@ import { logActivityServer } from '@/lib/activityLog';
 // Explicitly define edge execution for Cloudflare compatibility
 export const runtime = 'edge';
 
+const VALID_MEETING_TYPES = ['scheduled', 'instant'] as const;
+
 /**
  * POST /api/meetings
- * Body: { title, description?, date, participants?, link? }
+ * Body: { title, description?, date, participants?, link?, type? }
  *
  * Creates a meeting. Restricted to lead / admin.
+ * `type` distinguishes an ad-hoc "Start Instant Meeting" from a normally
+ * scheduled one, purely for UI display (badge/filtering) — both are stored
+ * and read identically otherwise. Defaults to 'scheduled'.
  */
 export const POST = requireRole(['lead', 'admin'], async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
-    const { title, description, date, time, platform, participants, link } = body;
+    const { title, description, date, time, platform, participants, link, type } = body;
 
     if (!title || typeof title !== 'string' || title.trim() === '') {
       return NextResponse.json(
@@ -35,6 +40,12 @@ export const POST = requireRole(['lead', 'admin'], async (req) => {
         { status: 400 }
       );
     }
+    if (type !== undefined && !VALID_MEETING_TYPES.includes(type)) {
+      return NextResponse.json(
+        { error: 'Bad Request', details: `Field "type" must be one of: ${VALID_MEETING_TYPES.join(', ')}.` },
+        { status: 400 }
+      );
+    }
 
     const meetingId = await firestoreAdminCreate('meetings', {
       title: title.trim(),
@@ -44,6 +55,7 @@ export const POST = requireRole(['lead', 'admin'], async (req) => {
       platform: platform ? String(platform).trim() : null,
       participants: Array.isArray(participants) ? participants : [],
       link: link ? String(link).trim() : null,
+      type: type === 'instant' ? 'instant' : 'scheduled',
       createdBy: req.user.uid,
       createdAt: new Date().toISOString(),
     });

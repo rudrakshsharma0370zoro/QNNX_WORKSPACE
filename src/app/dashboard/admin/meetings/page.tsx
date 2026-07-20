@@ -1,44 +1,171 @@
 "use client";
-import { useState } from 'react';
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { X, Plus, Video, Users, Calendar, Clock } from 'lucide-react';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { useAuth } from '@/components/AuthProvider';
+import { X, Plus, Video, Users, Calendar, Clock, Zap } from 'lucide-react';
+
+interface Meeting {
+  id: string;
+  title: string;
+  date: string;
+  time?: string | null;
+  platform?: string | null;
+  link?: string | null;
+  participants?: string[];
+  type?: 'scheduled' | 'instant';
+  createdAt?: string;
+}
+
+interface AppUser {
+  id: string;
+  name?: string;
+  email?: string;
+  role?: string;
+}
+
+const EMPTY_FORM = { title: '', platform: 'Google Meet', link: '', date: '', time: '' };
 
 export default function AdminMeetings() {
-  const [meetings, setMeetings] = useState<any[]>([]);
+  const { user } = useAuth();
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [allUsers, setAllUsers] = useState<AppUser[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newMeeting, setNewMeeting] = useState(EMPTY_FORM);
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [startingInstant, setStartingInstant] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const q = query(collection(db, 'meetings'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setMeetings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // Real meetings data — previously this page subscribed to Firestore but
+    // never rendered the result, showing three hardcoded example cards instead.
+    const unsubMeetings = onSnapshot(
+      query(collection(db, 'meetings'), orderBy('createdAt', 'desc')),
+      (snapshot) => {
+        setMeetings(snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Meeting[]);
+      }
+    );
+    // Used to build the "invite participants" picker in the schedule modal.
+    const unsubUsers = onSnapshot(query(collection(db, 'users')), (snapshot) => {
+      setAllUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as AppUser[]);
     });
-    return () => unsubscribe();
+    return () => { unsubMeetings(); unsubUsers(); };
   }, []);
 
-  const handleJoin = (platform: string) => {
-    // Simulate joining a meeting by opening a generic video URL
-    alert(`Opening ${platform} meeting in a new tab...`);
-    window.open('https://meet.google.com/new', '_blank');
+  const toggleParticipant = (uid: string) => {
+    setSelectedParticipants(prev =>
+      prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid]
+    );
   };
+
+  const resetForm = () => {
+    setNewMeeting(EMPTY_FORM);
+    setSelectedParticipants([]);
+    setError('');
+  };
+
+  const handleCreateMeeting = async () => {
+    if (!newMeeting.title.trim() || !newMeeting.date) {
+      setError('Title and date are required.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const res = await fetchWithAuth('/api/meetings', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...newMeeting,
+          participants: selectedParticipants,
+          type: 'scheduled',
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.details || body.error || 'Failed to create meeting.');
+      }
+      setIsAddModalOpen(false);
+      resetForm();
+    } catch (e: any) {
+      setError(e.message || 'Failed to create meeting.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Creates and immediately opens an ad-hoc meeting with no scheduling step —
+  // the moment you click, a meeting is written to Firestore, everyone
+  // currently on this page's team list is invited, and the call opens.
+  const handleStartInstantMeeting = async () => {
+    setStartingInstant(true);
+    setError('');
+    try {
+      const now = new Date();
+      const organizerName = user?.displayName || user?.email || 'Someone';
+      const res = await fetchWithAuth('/api/meetings', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: `Instant Meeting — started by ${organizerName}`,
+          date: now.toISOString(),
+          time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          platform: 'Google Meet',
+          // No real video-conferencing API is integrated yet, so a fresh Meet
+          // room is generated the same way the "Join" buttons already do.
+          link: 'https://meet.google.com/new',
+          participants: allUsers.filter(u => u.id !== user?.uid).map(u => u.id),
+          type: 'instant',
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.details || body.error || 'Failed to start meeting.');
+      }
+      window.open('https://meet.google.com/new', '_blank');
+    } catch (e: any) {
+      setError(e.message || 'Failed to start instant meeting.');
+    } finally {
+      setStartingInstant(false);
+    }
+  };
+
+  const handleJoin = (meeting: Meeting) => {
+    window.open(meeting.link || 'https://meet.google.com/new', '_blank');
+  };
+
+  const upcoming = meetings.filter(m => new Date(m.date) >= new Date());
+  const past = meetings.filter(m => new Date(m.date) < new Date());
 
   return (
     <div className="font-sans text-gray-800 bg-[#F8FAFC] p-6 lg:p-8 min-h-full w-full relative">
       <div className="max-w-[1200px] mx-auto space-y-8">
-        
+
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-[22px] font-bold text-[#111827]">Meetings</h2>
             <p className="text-[13px] text-gray-500 mt-1">Manage your schedule, schedule new meetings, and join calls.</p>
           </div>
-          <button 
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#4F46E5] text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Schedule Meeting
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleStartInstantMeeting}
+              disabled={startingInstant}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-indigo-200 text-indigo-600 rounded-md text-sm font-medium hover:bg-indigo-50 transition-colors disabled:opacity-60"
+            >
+              <Zap className="w-4 h-4" /> {startingInstant ? 'Starting…' : 'Start Instant Meeting'}
+            </button>
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-[#4F46E5] text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" /> Schedule Meeting
+            </button>
+          </div>
         </div>
+
+        {error && (
+          <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">{error}</div>
+        )}
 
         {/* Upcoming Section */}
         <div className="space-y-4">
@@ -46,136 +173,170 @@ export default function AdminMeetings() {
             <Video className="w-4 h-4 text-indigo-600" />
             Upcoming
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            
-            {/* Card 1 */}
-            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between hover:border-indigo-300 transition-colors">
-              <div>
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-bold text-gray-900">Daily Standup</h4>
-                  <button className="text-gray-400 hover:text-indigo-600">•••</button>
-                </div>
-                <span className="px-2 py-0.5 text-[10px] font-bold text-indigo-600 bg-indigo-50 rounded border border-indigo-100">RECURRING</span>
-                
-                <div className="mt-4 space-y-2 text-[13px] text-gray-500">
-                  <div className="flex items-center gap-2"><Calendar className="w-4 h-4" /> Today</div>
-                  <div className="flex items-center gap-2"><Clock className="w-4 h-4" /> 10:00 AM - 10:30 AM</div>
-                  <div className="flex items-center gap-2"><Users className="w-4 h-4" /> Alice, Bob, Charlie, You</div>
-                </div>
-              </div>
-              <div className="mt-6 flex items-center justify-between pt-4 border-t border-gray-100">
-                <div className="flex items-center gap-2 text-[13px] font-medium text-gray-600">
-                  <Video className="w-4 h-4 text-blue-500" /> Google Meet
-                </div>
-                <button 
-                  onClick={() => handleJoin('Google Meet')}
-                  className="px-4 py-1.5 bg-[#4F46E5] text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
-                >
-                  Join
-                </button>
-              </div>
-            </div>
 
-            {/* Card 2 */}
-            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between hover:border-indigo-300 transition-colors">
-              <div>
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-bold text-gray-900">Design Sync - Profile</h4>
-                  <button className="text-gray-400 hover:text-indigo-600">•••</button>
-                </div>
-                <span className="px-2 py-0.5 text-[10px] font-bold text-orange-600 bg-orange-50 rounded border border-orange-100">AD-HOC</span>
-                
-                <div className="mt-4 space-y-2 text-[13px] text-gray-500">
-                  <div className="flex items-center gap-2"><Calendar className="w-4 h-4" /> Today</div>
-                  <div className="flex items-center gap-2"><Clock className="w-4 h-4" /> 2:00 PM - 3:00 PM</div>
-                  <div className="flex items-center gap-2"><Users className="w-4 h-4" /> Charlie, Maria, You</div>
-                </div>
-              </div>
-              <div className="mt-6 flex items-center justify-between pt-4 border-t border-gray-100">
-                <div className="flex items-center gap-2 text-[13px] font-medium text-gray-600">
-                  <Video className="w-4 h-4 text-blue-500" /> Zoom
-                </div>
-                <button 
-                  onClick={() => handleJoin('Zoom')}
-                  className="px-4 py-1.5 bg-[#4F46E5] text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
-                >
-                  Join
-                </button>
-              </div>
+          {upcoming.length === 0 ? (
+            <div className="py-12 text-center bg-white rounded-xl border border-dashed border-gray-300">
+              <p className="text-[14px] text-gray-500 font-medium">No upcoming meetings. Schedule one or start an instant meeting above.</p>
             </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {upcoming.map((meeting) => (
+                <div key={meeting.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between hover:border-indigo-300 transition-colors">
+                  <div>
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-bold text-gray-900">{meeting.title}</h4>
+                    </div>
+                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${
+                      meeting.type === 'instant'
+                        ? 'text-orange-600 bg-orange-50 border-orange-100'
+                        : 'text-green-600 bg-green-50 border-green-100'
+                    }`}>
+                      {meeting.type === 'instant' ? 'INSTANT' : 'SCHEDULED'}
+                    </span>
 
-            {/* Card 3 */}
-            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between hover:border-indigo-300 transition-colors">
-              <div>
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-bold text-gray-900">Sprint Planning</h4>
-                  <button className="text-gray-400 hover:text-indigo-600">•••</button>
+                    <div className="mt-4 space-y-2 text-[13px] text-gray-500">
+                      <div className="flex items-center gap-2"><Calendar className="w-4 h-4" /> {new Date(meeting.date).toLocaleDateString()}</div>
+                      {meeting.time && <div className="flex items-center gap-2"><Clock className="w-4 h-4" /> {meeting.time}</div>}
+                      <div className="flex items-center gap-2"><Users className="w-4 h-4" /> {meeting.participants?.length ?? 0} invited</div>
+                    </div>
+                  </div>
+                  <div className="mt-6 flex items-center justify-between pt-4 border-t border-gray-100">
+                    <div className="flex items-center gap-2 text-[13px] font-medium text-gray-600">
+                      <Video className="w-4 h-4 text-blue-500" /> {meeting.platform || 'Video Call'}
+                    </div>
+                    <button
+                      onClick={() => handleJoin(meeting)}
+                      className="px-4 py-1.5 bg-[#4F46E5] text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
+                    >
+                      Join
+                    </button>
+                  </div>
                 </div>
-                <span className="px-2 py-0.5 text-[10px] font-bold text-green-600 bg-green-50 rounded border border-green-100">SCHEDULED</span>
-                
-                <div className="mt-4 space-y-2 text-[13px] text-gray-500">
-                  <div className="flex items-center gap-2"><Calendar className="w-4 h-4" /> Tomorrow</div>
-                  <div className="flex items-center gap-2"><Clock className="w-4 h-4" /> 11:00 AM - 12:30 PM</div>
-                  <div className="flex items-center gap-2"><Users className="w-4 h-4" /> Alice, Bob, Charlie, Maria, You</div>
-                </div>
-              </div>
-              <div className="mt-6 flex items-center justify-between pt-4 border-t border-gray-100">
-                <div className="flex items-center gap-2 text-[13px] font-medium text-gray-600">
-                  <Video className="w-4 h-4 text-purple-600" /> Microsoft Teams
-                </div>
-                <button 
-                  onClick={() => handleJoin('Teams')}
-                  className="px-4 py-1.5 bg-[#4F46E5] text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
-                >
-                  Join
-                </button>
-              </div>
+              ))}
             </div>
-
-          </div>
+          )}
         </div>
+
+        {/* Past Section */}
+        {past.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold text-[#111827] flex items-center gap-2">
+              <Clock className="w-4 h-4 text-gray-500" />
+              Past
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {past.map((meeting) => (
+                <div key={meeting.id} className="bg-gray-50 p-5 rounded-xl border border-gray-200 opacity-80">
+                  <h4 className="font-semibold text-gray-700">{meeting.title}</h4>
+                  <div className="mt-2 text-[13px] text-gray-500 flex items-center gap-2">
+                    <Calendar className="w-4 h-4" /> {new Date(meeting.date).toLocaleDateString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
       </div>
 
       {/* Schedule Meeting Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-gray-900/40 z-[100] flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-[400px] border border-gray-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+          <div className="bg-white rounded-xl shadow-xl w-[440px] max-h-[85vh] overflow-y-auto border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 sticky top-0">
               <h3 className="text-sm font-bold text-gray-900">Schedule New Meeting</h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => { setIsAddModalOpen(false); resetForm(); }} className="text-gray-400 hover:text-gray-600">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            
+
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Meeting Title</label>
-                <input type="text" placeholder="e.g. Weekly Review" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
+                <input
+                  type="text"
+                  value={newMeeting.title}
+                  onChange={e => setNewMeeting({ ...newMeeting, title: e.target.value })}
+                  placeholder="e.g. Weekly Review"
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Date</label>
-                  <input type="date" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700" />
+                  <input
+                    type="date"
+                    value={newMeeting.date}
+                    onChange={e => setNewMeeting({ ...newMeeting, date: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700"
+                  />
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Time</label>
-                  <input type="time" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700" />
+                  <input
+                    type="time"
+                    value={newMeeting.time}
+                    onChange={e => setNewMeeting({ ...newMeeting, time: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700"
+                  />
                 </div>
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Platform</label>
-                <select className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700">
+                <select
+                  value={newMeeting.platform}
+                  onChange={e => setNewMeeting({ ...newMeeting, platform: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700"
+                >
                   <option>Google Meet</option>
                   <option>Zoom</option>
                   <option>Microsoft Teams</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Meeting Link (optional)</label>
+                <input
+                  type="text"
+                  value={newMeeting.link}
+                  onChange={e => setNewMeeting({ ...newMeeting, link: e.target.value })}
+                  placeholder="https://..."
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                  Invite Participants ({selectedParticipants.length} selected)
+                </label>
+                <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                  {allUsers.filter(u => u.id !== user?.uid).map(u => (
+                    <label key={u.id} className="flex items-center gap-3 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedParticipants.includes(u.id)}
+                        onChange={() => toggleParticipant(u.id)}
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span>{u.name || u.email || u.id}</span>
+                      {u.role && <span className="ml-auto text-[10px] text-gray-400 uppercase">{u.role}</span>}
+                    </label>
+                  ))}
+                  {allUsers.length === 0 && (
+                    <p className="px-3 py-2 text-[12px] text-gray-400">No other users found yet.</p>
+                  )}
+                </div>
+              </div>
+              {error && <p className="text-[12px] text-red-600">{error}</p>}
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
-              <button onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-              <button onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700">Schedule Meeting</button>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 sticky bottom-0">
+              <button onClick={() => { setIsAddModalOpen(false); resetForm(); }} className="px-4 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button
+                onClick={handleCreateMeeting}
+                disabled={saving}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 disabled:opacity-60"
+              >
+                {saving ? 'Scheduling…' : 'Schedule Meeting'}
+              </button>
             </div>
           </div>
         </div>

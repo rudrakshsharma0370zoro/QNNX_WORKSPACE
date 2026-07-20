@@ -12,6 +12,9 @@ export default function AdminTasks() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newTask, setNewTask] = useState({ title: '', projectId: '', priority: 'Medium', assigneeId: '', status: 'Pending' });
   const [loading, setLoading] = useState(false);
+  const [editingTask, setEditingTask] = useState<any | null>(null);
+  const [editTaskForm, setEditTaskForm] = useState({ title: '', projectId: '', priority: 'Medium', assigneeId: '' });
+  const [editTaskLoading, setEditTaskLoading] = useState(false);
 
   useEffect(() => {
     const unsubTasks = onSnapshot(query(collection(db, 'tasks')), snapshot => {
@@ -88,6 +91,43 @@ export default function AdminTasks() {
     }
   };
 
+  const openEditModal = (task: any) => {
+    setEditingTask(task);
+    setEditTaskForm({
+      title: task.title || '',
+      projectId: task.projectId || '',
+      priority: task.priority ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1) : 'Medium',
+      assigneeId: task.assigneeId || '',
+    });
+  };
+
+  const handleUpdateTask = async () => {
+    if (!editingTask || !editTaskForm.title) return;
+    setEditTaskLoading(true);
+    try {
+      // assigneeId is required to be non-empty by the API when present at all
+      // (unlike projectId, which accepts null) — omit it entirely rather than
+      // send '' when the task is left unassigned, so the update still goes
+      // through for every other field.
+      const body: Record<string, unknown> = {
+        title: editTaskForm.title,
+        projectId: editTaskForm.projectId || null,
+        priority: editTaskForm.priority.toLowerCase(),
+      };
+      if (editTaskForm.assigneeId) body.assigneeId = editTaskForm.assigneeId;
+
+      await fetchWithAuth(`/api/tasks/${editingTask.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      });
+      setEditingTask(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setEditTaskLoading(false);
+    }
+  };
+
   return (
     <div className="font-sans text-gray-800 bg-[#F8FAFC] p-6 lg:p-8 min-h-full w-full relative">
       <div className="max-w-[1200px] mx-auto space-y-6">
@@ -157,7 +197,7 @@ export default function AdminTasks() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-1.5 bg-gray-50 hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 rounded transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => openEditModal(task)} className="p-1.5 bg-gray-50 hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 rounded transition-colors" title="Edit Task"><Edit2 className="w-3.5 h-3.5" /></button>
                         <button onClick={() => handleDelete(task.id)} className="p-1.5 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </td>
@@ -221,6 +261,64 @@ export default function AdminTasks() {
               </button>
               <button onClick={handleCreateTask} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 transition-colors">
                 Create Task
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {editingTask && (
+        <div className="fixed inset-0 bg-gray-900/40 z-[100] flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-[450px] border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="text-sm font-bold text-gray-900">Edit Task</h3>
+              <button onClick={() => setEditingTask(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Task Title</label>
+                <input type="text" value={editTaskForm.title} onChange={e => setEditTaskForm({...editTaskForm, title: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Project</label>
+                <select value={editTaskForm.projectId} onChange={e => setEditTaskForm({...editTaskForm, projectId: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700">
+                  <option value="">Select Project</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Priority</label>
+                  <select value={editTaskForm.priority} onChange={e => setEditTaskForm({...editTaskForm, priority: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700">
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Assign To</label>
+                  <select value={editTaskForm.assigneeId} onChange={e => setEditTaskForm({...editTaskForm, assigneeId: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700">
+                    <option value="">Unassigned</option>
+                    {users.map(e => (
+                      <option key={e.id} value={e.id}>{e.name || e.email}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+              <button onClick={() => setEditingTask(null)} className="px-4 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleUpdateTask} disabled={editTaskLoading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 transition-colors">
+                Save Changes
               </button>
             </div>
           </div>
