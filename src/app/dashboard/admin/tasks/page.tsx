@@ -4,6 +4,7 @@ import { Edit2, Trash2, X, Plus } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function AdminTasks() {
   const [tasks, setTasks] = useState<any[]>([]);
@@ -15,6 +16,7 @@ export default function AdminTasks() {
   const [editingTask, setEditingTask] = useState<any | null>(null);
   const [editTaskForm, setEditTaskForm] = useState({ title: '', projectId: '', priority: 'Medium', assigneeId: '' });
   const [editTaskLoading, setEditTaskLoading] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     const unsubTasks = onSnapshot(query(collection(db, 'tasks')), snapshot => {
@@ -186,14 +188,20 @@ export default function AdminTasks() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <button 
-                        onClick={() => cycleStatus(task.id, task.status)}
-                        title="Click to cycle status"
-                        className={`flex items-center justify-between w-[110px] mx-auto px-3 py-1.5 rounded-md border text-[11px] font-bold ${getStatusColor(task.status || 'pending')} hover:opacity-80 transition-opacity`}
-                      >
-                        {(task.status || 'pending').toUpperCase()}
-                        <svg className="w-3 h-3 ml-2 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                      </button>
+                      {user?.uid === task.assigneeId ? (
+                        <button 
+                          onClick={() => cycleStatus(task.id, task.status)}
+                          title="Click to cycle status"
+                          className={`flex items-center justify-between w-[110px] mx-auto px-3 py-1.5 rounded-md border text-[11px] font-bold ${getStatusColor(task.status || 'pending')} hover:opacity-80 transition-opacity`}
+                        >
+                          {(task.status || 'pending').toUpperCase()}
+                          <svg className="w-3 h-3 ml-2 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </button>
+                      ) : (
+                        <span className={`inline-block w-[110px] text-center px-3 py-1.5 rounded-md border text-[11px] font-bold ${getStatusColor(task.status || 'pending')}`}>
+                          {(task.status || 'pending').toUpperCase()}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">

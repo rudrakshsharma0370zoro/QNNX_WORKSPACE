@@ -84,8 +84,14 @@ export const PATCH = requireRole(['user', 'lead', 'admin'], async (req, context)
     const appendUnique: Record<string, unknown[]> = {};
     let addedComment: Record<string, unknown> | null = null;
 
-    // status — anyone permitted on this task
+    // status — only assignee permitted on this task
     if (body.status !== undefined) {
+      if (!isAssignee) {
+        return NextResponse.json(
+          { error: 'Forbidden', details: 'Only the specific assignee can update the task status.' },
+          { status: 403 }
+        );
+      }
       if (!VALID_STATUSES.includes(body.status)) {
         return NextResponse.json(
           { error: 'Bad Request', details: `"status" must be one of: ${VALID_STATUSES.join(', ')}.` },

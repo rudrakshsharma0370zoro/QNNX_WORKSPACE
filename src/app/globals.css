@@ -3,3 +3,61 @@
 @theme {
   --font-sans: "Inter", "Roboto", "Helvetica Neue", sans-serif;
 }
+
+/* Base styles to ensure root background inherits correctly */
+body {
+  background-color: var(--color-gray-50);
+  color: var(--color-gray-900);
+}
+
+/* Hack to override hardcoded hex values in the codebase with our theme variables */
+.dark [class*="bg-[#F8FAFC]"], .reading [class*="bg-[#F8FAFC]"] { background-color: var(--color-gray-50) !important; }
+.dark [class*="text-[#111827]"], .reading [class*="text-[#111827]"] { color: var(--color-gray-900) !important; }
+.dark [class*="bg-[#4F46E5]"], .reading [class*="bg-[#4F46E5]"] { background-color: var(--color-indigo-600) !important; }
+.dark [class*="text-[#4F46E5]"], .reading [class*="text-[#4F46E5]"] { color: var(--color-indigo-600) !important; }
+
+/* 
+  DARK MODE THEME
+  Overrides Tailwind's built-in CSS variables when .dark class is present 
+*/
+.dark {
+  --color-white: #1E293B;
+  --color-gray-50: #0F172A;
+  --color-gray-100: #1E293B;
+  --color-gray-200: #334155;
+  --color-gray-300: #475569;
+  --color-gray-400: #64748B;
+  --color-gray-500: #94A3B8;
+  --color-gray-600: #CBD5E1;
+  --color-gray-700: #E2E8F0;
+  --color-gray-800: #F1F5F9;
+  --color-gray-900: #F8FAFC;
+  
+  --color-indigo-50: #312E81;
+  --color-indigo-100: #3730A3;
+  --color-indigo-600: #818CF8;
+  --color-indigo-700: #6366F1;
+}
+
+/* 
+  READING MODE THEME (Warm / Sepia)
+  Activated via next-themes class="reading"
+*/
+.reading {
+  --color-white: #FFFDF7;
+  --color-gray-50: #FDF6E3;
+  --color-gray-100: #EEE8D5;
+  --color-gray-200: #E3DAC9;
+  --color-gray-300: #D3C7A9;
+  --color-gray-400: #A89F91;
+  --color-gray-500: #8B7355;
+  --color-gray-600: #6B5B4F;
+  --color-gray-700: #5C4B51;
+  --color-gray-800: #4A3B40;
+  --color-gray-900: #362B2E;
+  
+  --color-indigo-50: #F4ECD8;
+  --color-indigo-100: #EADCB8;
+  --color-indigo-600: #A58E74;
+  --color-indigo-700: #8A735A;
+}
