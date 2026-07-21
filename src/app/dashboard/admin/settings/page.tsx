@@ -47,9 +47,8 @@ export default function AdminSettings() {
     newPass: '',
     confirm: ''
   });
-  const [otpModalOpen, setOtpModalOpen] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  const [otpVerified, setOtpVerified] = useState(false); // Controls bypassing 'Current Password'
+  const [securityError, setSecurityError] = useState("");
+  const [securitySuccess, setSecuritySuccess] = useState("");
 
   // Tab 5: Appearance
   const { theme: globalTheme, setTheme: setGlobalTheme } = useTheme();
@@ -218,11 +217,13 @@ export default function AdminSettings() {
   };
 
   const handleChangePassword = async () => {
+    setSecurityError("");
+    setSecuritySuccess("");
     if (passwords.newPass !== passwords.confirm) {
-      return alert('New passwords do not match!');
+      return setSecurityError('New passwords do not match!');
     }
     if (passwords.newPass.length < 6) {
-      return alert('Password must be at least 6 characters.');
+      return setSecurityError('Password must be at least 6 characters.');
     }
     
     try {
@@ -230,44 +231,49 @@ export default function AdminSettings() {
       const user = auth.currentUser;
       if (!user || !user.email) throw new Error("No user logged in");
       
-      // If OTP wasn't verified, we MUST verify the current password first
-      if (!otpVerified) {
-        if (!passwords.current) {
-          return alert("Please enter your current password.");
-        }
-        const credential = EmailAuthProvider.credential(user.email, passwords.current);
-        await reauthenticateWithCredential(user, credential);
+      if (!passwords.current) {
+        return setSecurityError("Please enter your current password.");
       }
+      const credential = EmailAuthProvider.credential(user.email, passwords.current);
+      await reauthenticateWithCredential(user, credential);
       
       // Update the password
       await updatePassword(user, passwords.newPass);
-      showMessage('Password updated successfully!');
+      setSecuritySuccess('Password updated successfully!');
       
       // Reset form
       setPasswords({ current: '', newPass: '', confirm: '' });
-      setOtpVerified(false);
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
-        alert("Incorrect current password.");
+        setSecurityError("Incorrect current password.");
       } else if (err.code === 'auth/requires-recent-login') {
-        alert("Your session is too old. Please log out and log back in, or use the standard password reset flow.");
+        setSecurityError("Your session is too old. Please log out and log back in, or use the standard password reset flow.");
       } else {
-        alert(err.message || 'Failed to update password');
+        setSecurityError(err.message || 'Failed to update password');
       }
     } finally {
       setSaving(false);
     }
   };
 
-  const handleVerifyOtp = () => {
-    if (otpCode === '123456') {
-      setOtpVerified(true);
-      setOtpModalOpen(false);
-      setOtpCode('');
-      showMessage('Identity verified! You may now set a new password.');
-    } else {
-      alert('Invalid OTP code. For this simulation, use 123456.');
+  const handleForgotPassword = async () => {
+    setSecurityError("");
+    setSecuritySuccess("");
+    try {
+      setSaving(true);
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: profile.email })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.details || data.error || 'Failed to send reset link');
+      setSecuritySuccess('Password reset link sent to your email.');
+    } catch (err: any) {
+      setSecurityError(err.message || 'Failed to send reset link');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -739,31 +745,36 @@ export default function AdminSettings() {
                 <div className="max-w-md space-y-5">
                   <h4 className="text-[14px] font-semibold text-gray-900 border-b border-gray-100 pb-2">Change Password</h4>
                   
-                  {/* Current Password Field (Hidden if bypassed by OTP) */}
-                  {!otpVerified && (
-                    <div>
-                      <label className="block text-[13px] font-semibold text-gray-700 mb-1">Current Password</label>
-                      <input 
-                        type="password" 
-                        placeholder="••••••••" 
-                        value={passwords.current}
-                        onChange={(e) => setPasswords({...passwords, current: e.target.value})}
-                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" 
-                      />
-                      <button 
-                        onClick={() => setOtpModalOpen(true)}
-                        className="text-[12px] text-indigo-600 hover:text-indigo-700 font-medium mt-1.5 focus:outline-none"
-                      >
-                        Forgot Current Password?
-                      </button>
+                  {securityError && (
+                    <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-600">
+                      {securityError}
+                    </div>
+                  )}
+                  {securitySuccess && (
+                    <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-600">
+                      {securitySuccess}
                     </div>
                   )}
 
-                  {otpVerified && (
-                    <div className="px-3 py-2 bg-green-50 border border-green-200 text-green-700 rounded-lg text-[13px] flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4" /> Identity verified via OTP. You may now set a new password.
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-[13px] font-semibold text-gray-700">Current Password</label>
+                      <button 
+                        onClick={handleForgotPassword}
+                        disabled={saving}
+                        className="text-[12px] text-indigo-600 hover:text-indigo-700 font-medium focus:outline-none disabled:opacity-50"
+                      >
+                        Forgot Password?
+                      </button>
                     </div>
-                  )}
+                    <input 
+                      type="password" 
+                      placeholder="••••••••" 
+                      value={passwords.current}
+                      onChange={(e) => setPasswords({...passwords, current: e.target.value})}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" 
+                    />
+                  </div>
 
                   <div>
                     <label className="block text-[13px] font-semibold text-gray-700 mb-1">New Password</label>
@@ -788,7 +799,7 @@ export default function AdminSettings() {
                   <div className="pt-2">
                     <button 
                       onClick={handleChangePassword}
-                      disabled={saving || !passwords.newPass || !passwords.confirm || (!otpVerified && !passwords.current)}
+                      disabled={saving || !passwords.newPass || !passwords.confirm || !passwords.current}
                       className="w-auto px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -799,51 +810,8 @@ export default function AdminSettings() {
 
               </div>
             )}
-
           </div>
         </div>
-
-        {/* OTP Modal */}
-        {otpModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-sm p-6 relative animate-in zoom-in-95 duration-200">
-              <button 
-                onClick={() => setOtpModalOpen(false)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              
-              <h3 className="text-lg font-bold text-gray-900 mb-1">Security Check</h3>
-              <p className="text-[13px] text-gray-500 mb-6">
-                An OTP has been sent to your registered phone number. Enter the code below to reset your password. (Use <span className="font-mono bg-gray-100 px-1 rounded text-gray-800">123456</span> for this simulation).
-              </p>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-[13px] font-semibold text-gray-700 mb-1">6-Digit Code</label>
-                  <input 
-                    type="text" 
-                    maxLength={6}
-                    placeholder="000000"
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-center text-lg tracking-widest font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                  />
-                </div>
-                
-                <button 
-                  onClick={handleVerifyOtp}
-                  disabled={otpCode.length < 6}
-                  className="w-full py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50"
-                >
-                  Verify Identity
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
       </div>
     </div>
   );
