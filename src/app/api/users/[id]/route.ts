@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireRole, RouteContext, AuthenticatedRequest } from '@/lib/auth';
-import { firestoreAdminUpdate, firestoreAdminSet, firestoreAdminGet } from '@/lib/firestoreAdmin';
+import { firestoreAdminUpdate, firestoreAdminSet, firestoreAdminGet, firestoreAdminDelete } from '@/lib/firestoreAdmin';
+import { deleteAuthUser } from '@/lib/firebaseAuthAdmin';
 
 // Explicitly define edge execution for Cloudflare compatibility
 export const runtime = 'edge';
@@ -224,3 +225,49 @@ async function getUserProfile(
 }
 
 export const GET = requireRole([], getUserProfile);
+
+async function deleteUserProfile(
+  req: AuthenticatedRequest,
+  context: RouteContext
+): Promise<Response> {
+  try {
+    const params = await context.params;
+    const rawId = params.id;
+    const uid = Array.isArray(rawId) ? rawId[0] : rawId;
+    if (!uid) return NextResponse.json({ error: 'Bad Request' }, { status: 400 });
+
+    const isSelf = req.user.uid === uid;
+    const isAdmin = (req.user.role || 'user') === 'admin';
+    if (!isSelf && !isAdmin) {
+      return NextResponse.json({ error: 'Forbidden', details: 'You can only delete your own profile.' }, { status: 403 });
+    }
+
+    // Delete Firestore private details
+    try {
+      await firestoreAdminDelete(privatePath(uid), PRIVATE_DETAILS_DOC);
+    } catch (err: any) {
+      console.warn(`[API Users] Failed to delete private details for ${uid}:`, err.message);
+    }
+
+    // Delete Firestore public profile
+    try {
+      await firestoreAdminDelete('users', uid);
+    } catch (err: any) {
+      console.warn(`[API Users] Failed to delete public profile for ${uid}:`, err.message);
+    }
+
+    // Delete Firebase Auth user
+    try {
+      await deleteAuthUser(uid);
+    } catch (err: any) {
+      console.error(`[API Users] Failed to delete Auth user ${uid}:`, err.message);
+      return NextResponse.json({ error: 'Internal Server Error', details: 'Failed to delete Auth record.' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, message: 'Profile deleted successfully.' });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export const DELETE = requireRole([], deleteUserProfile);

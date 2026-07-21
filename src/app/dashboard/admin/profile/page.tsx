@@ -1,8 +1,15 @@
 "use client";
 import { useState } from 'react';
-import { User, ShieldCheck } from 'lucide-react';
+import { User, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { useAuth } from '@/components/AuthProvider';
+import { useRouter } from 'next/navigation';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 export default function AdminMyProfile() {
+  const { user, logout } = useAuth();
+  const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
   const [profileData, setProfileData] = useState({
     name: 'Admin User',
     role: 'System Administrator',
@@ -95,8 +102,54 @@ export default function AdminMyProfile() {
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+              {error && <span className="text-red-500 text-sm mt-2">{error}</span>}
               <button className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
               <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors">Save Changes</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Danger Zone */}
+        <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden max-w-3xl">
+          <div className="px-8 py-6 border-b border-red-100 flex items-center gap-4 bg-red-50/50">
+            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-red-900">Danger Zone</h3>
+              <p className="text-sm text-red-500">Irreversible and destructive actions.</p>
+            </div>
+          </div>
+          <div className="p-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-gray-900">Delete Profile</h4>
+                <p className="text-[13px] text-gray-500 mt-1 max-w-md">
+                  Permanently delete your profile and authentication data. This action cannot be undone.
+                </p>
+              </div>
+              <button 
+                disabled={deleting}
+                onClick={async () => {
+                  if (confirm("Are you absolutely sure you want to delete your profile? This is permanent!")) {
+                    setDeleting(true);
+                    setError("");
+                    try {
+                      if (!user?.uid) throw new Error("Not logged in");
+                      const res = await fetchWithAuth(`/api/users/${user.uid}`, { method: 'DELETE' });
+                      if (!res.ok) throw new Error("Failed to delete profile");
+                      await logout();
+                      router.push("/");
+                    } catch (err: any) {
+                      setError(err.message || "Failed to delete account");
+                      setDeleting(false);
+                    }
+                  }
+                }}
+                className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-semibold hover:bg-red-600 hover:text-white transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete Profile'}
+              </button>
             </div>
           </div>
         </div>

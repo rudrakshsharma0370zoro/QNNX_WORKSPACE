@@ -6,6 +6,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { isUpcoming } from '@/utils/meeting';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import {
   LayoutDashboard, Briefcase, CheckSquare, CalendarDays, FolderOpen,
   Search, Bell, Settings, LogOut, X, User as UserIcon
@@ -29,6 +30,8 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   // Draft state for the Edit Profile modal, seeded from the real signed-in
   // profile once it loads (replaces the previous hardcoded "John Doe").
   const [profileData, setProfileData] = useState({ name: '', role: 'Employee', email: '' });
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (profile) {
@@ -270,14 +273,39 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
-              <button onClick={() => setIsProfileOpen(false)} className="px-4 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-                Cancel
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-between gap-3 bg-gray-50">
+              <button 
+                disabled={deleting}
+                onClick={async () => {
+                  if (confirm("Are you absolutely sure you want to delete your profile? This is permanent!")) {
+                    setDeleting(true);
+                    setError("");
+                    try {
+                      if (!user?.uid) throw new Error("Not logged in");
+                      const res = await fetchWithAuth(`/api/users/${user.uid}`, { method: 'DELETE' });
+                      if (!res.ok) throw new Error("Failed to delete profile");
+                      await logout();
+                      router.push("/");
+                    } catch (err: any) {
+                      setError(err.message || "Failed to delete account");
+                      setDeleting(false);
+                    }
+                  }
+                }}
+                className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-[13px] font-semibold hover:bg-red-600 hover:text-white transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete Account'}
               </button>
-              <button onClick={() => setIsProfileOpen(false)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 transition-colors">
-                Save Changes
-              </button>
+              <div className="flex gap-3">
+                <button onClick={() => setIsProfileOpen(false)} className="px-4 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                  Cancel
+                </button>
+                <button onClick={() => setIsProfileOpen(false)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 transition-colors">
+                  Save Changes
+                </button>
+              </div>
             </div>
+            {error && <div className="px-6 pb-4 bg-gray-50 text-red-500 text-xs text-right">{error}</div>}
           </div>
         </div>
       )}

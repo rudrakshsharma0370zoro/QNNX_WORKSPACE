@@ -17,6 +17,7 @@ export default function Home() {
   const [fullName, setFullName] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
   // Once signed in, route by role: pending -> waiting list, otherwise dashboard.
@@ -33,6 +34,7 @@ export default function Home() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccessMsg("");
     setAuthLoading(true);
 
     try {
@@ -55,6 +57,32 @@ export default function Home() {
       }
     } catch (err: any) {
       setError(err?.message || "Authentication failed. Check your details.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError("Please enter your email address first.");
+      return;
+    }
+    setError("");
+    setSuccessMsg("");
+    setAuthLoading(true);
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.details || data.error || "Failed to send password reset email.");
+      }
+      setSuccessMsg("Password reset link sent to your email.");
+    } catch (err: any) {
+      setError(err?.message || "Failed to process request.");
     } finally {
       setAuthLoading(false);
     }
@@ -99,6 +127,11 @@ export default function Home() {
                 {error}
               </div>
             )}
+            {successMsg && (
+              <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-600">
+                {successMsg}
+              </div>
+            )}
 
             {isSignUp && (
               <div>
@@ -133,7 +166,18 @@ export default function Home() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Password</label>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Password</label>
+                {!isSignUp && (
+                  <button 
+                    type="button" 
+                    onClick={handleForgotPassword}
+                    className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 transition-colors"
+                  >
+                    Forgot Password?
+                  </button>
+                )}
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                 <input

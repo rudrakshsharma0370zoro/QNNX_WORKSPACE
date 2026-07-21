@@ -108,3 +108,62 @@ export async function setUserRole(uid: string, role: AppRole): Promise<void> {
     throw new Error(apiMessage || 'Failed to set custom claims via Identity Toolkit.');
   }
 }
+
+/**
+ * Deletes a user's Firebase Auth account.
+ * Throws if the account does not exist or fails to delete.
+ */
+export async function deleteAuthUser(uid: string): Promise<void> {
+  const token = await getGoogleAccessToken(GoogleScopes.IDENTITY_TOOLKIT);
+
+  const response = await fetch(
+    `${IDENTITY_TOOLKIT_BASE}/projects/${requireProjectId()}/accounts:delete`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ localId: uid }),
+    }
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    const apiMessage: string = data?.error?.message || '';
+    if (apiMessage === 'USER_NOT_FOUND') {
+      // If they are already deleted, consider it a success for idempotency
+      return;
+    }
+    throw new Error(apiMessage || 'Failed to delete Auth user via Identity Toolkit.');
+  }
+}
+
+/**
+ * Dispatches a password reset email to the user via Firebase Auth.
+ * Throws if the email is not found or fails to send.
+ */
+export async function sendPasswordResetEmailAdmin(email: string): Promise<void> {
+  const token = await getGoogleAccessToken(GoogleScopes.IDENTITY_TOOLKIT);
+
+  const response = await fetch(
+    `${IDENTITY_TOOLKIT_BASE}/projects/${requireProjectId()}/accounts:sendOobCode`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ requestType: 'PASSWORD_RESET', email }),
+    }
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    const apiMessage: string = data?.error?.message || '';
+    if (apiMessage === 'EMAIL_NOT_FOUND') {
+      throw new Error('EMAIL_NOT_FOUND');
+    }
+    throw new Error(apiMessage || 'Failed to send password reset email via Identity Toolkit.');
+  }
+}
