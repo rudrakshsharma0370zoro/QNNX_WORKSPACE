@@ -17,6 +17,7 @@ interface Meeting {
   participants?: string[];
   type?: 'scheduled' | 'instant';
   createdAt?: string;
+  createdBy?: string;
 }
 
 interface AppUser {
@@ -32,7 +33,11 @@ export default function AdminMeetings() {
   const { user } = useAuth();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [allUsers, setAllUsers] = useState<AppUser[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isInstantModalOpen, setIsInstantModalOpen] = useState(false);
+  const [selectedInstantUsers, setSelectedInstantUsers] = useState<string[]>([]);
+  const [selectedInstantTeams, setSelectedInstantTeams] = useState<string[]>([]);
   const [newMeeting, setNewMeeting] = useState(EMPTY_FORM);
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -52,7 +57,10 @@ export default function AdminMeetings() {
     const unsubUsers = onSnapshot(query(collection(db, 'users')), (snapshot) => {
       setAllUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as AppUser[]);
     });
-    return () => { unsubMeetings(); unsubUsers(); };
+    const unsubTeams = onSnapshot(query(collection(db, 'teams')), (snapshot) => {
+      setTeams(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => { unsubMeetings(); unsubUsers(); unsubTeams(); };
   }, []);
 
   const toggleParticipant = (uid: string) => {
@@ -79,6 +87,7 @@ export default function AdminMeetings() {
         method: 'POST',
         body: JSON.stringify({
           ...newMeeting,
+          link: newMeeting.link.trim() || null,
           participants: selectedParticipants,
           type: 'scheduled',
         }),
@@ -96,13 +105,33 @@ export default function AdminMeetings() {
     }
   };
 
-  // Creates and immediately opens an ad-hoc meeting with no scheduling step
-  // the moment you click, a meeting is written to Firestore, everyone
-  // currently on this page's team list is invited, and the call opens.
-  const handleStartInstantMeeting = async () => {
+  const openInstantModal = () => {
+    setSelectedInstantUsers([]);
+    setSelectedInstantTeams([]);
+    setIsInstantModalOpen(true);
+  };
+
+  const toggleInstantUser = (uid: string) => {
+    setSelectedInstantUsers(prev => prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid]);
+  };
+  
+  const toggleInstantTeam = (teamId: string) => {
+    setSelectedInstantTeams(prev => prev.includes(teamId) ? prev.filter(id => id !== teamId) : [...prev, teamId]);
+  };
+
+  const executeStartInstantMeeting = async () => {
     setStartingInstant(true);
     setError('');
     try {
+      const finalParticipants = new Set(selectedInstantUsers);
+      selectedInstantTeams.forEach(teamId => {
+        const team = teams.find(t => t.id === teamId);
+        if (team && Array.isArray(team.members)) {
+          team.members.forEach((uid: string) => finalParticipants.add(uid));
+        }
+      });
+      if (user?.uid) finalParticipants.add(user.uid);
+
       const now = new Date();
       const organizerName = user?.displayName || user?.email || 'Someone';
       // Jitsi fix: mint ONE room link up front, store it on the meeting, and
@@ -114,22 +143,19 @@ export default function AdminMeetings() {
           title: `Instant Meeting — started by ${organizerName}`,
           date: now.toISOString(),
           time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          // platform: 'Google Meet',
           platform: 'Jitsi Meet',
-          // Old approach — meet.google.com/new creates a DIFFERENT room for
-          // every person who opens it, so attendees never met each other:
-          // link: 'https://meet.google.com/new',
           link,
-          participants: allUsers.filter(u => u.id !== user?.uid).map(u => u.id),
+          participants: Array.from(finalParticipants),
           type: 'instant',
         }),
       });
+      
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
         throw new Error(body.details || body.error || 'Failed to start meeting.');
       }
-      // window.open('https://meet.google.com/new', '_blank');
       window.open(link, '_blank');
+      setIsInstantModalOpen(false);
     } catch (e: any) {
       setError(e.message || 'Failed to start instant meeting.');
     } finally {
@@ -138,9 +164,6 @@ export default function AdminMeetings() {
   };
 
   const handleJoin = (meeting: Meeting) => {
-    // window.open(meeting.link || 'https://meet.google.com/new', '_blank');
-    // Jitsi fix: joinUrl() falls back to a room named after the meeting id,
-    // so even link-less meetings put every joiner in the SAME room.
     window.open(joinUrl(meeting), '_blank');
   };
 
@@ -158,11 +181,10 @@ export default function AdminMeetings() {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={handleStartInstantMeeting}
-              disabled={startingInstant}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-indigo-200 text-indigo-600 rounded-md text-sm font-medium hover:bg-indigo-50 transition-colors disabled:opacity-60"
+              onClick={openInstantModal}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-indigo-200 text-indigo-600 rounded-md text-sm font-medium hover:bg-indigo-50 transition-colors"
             >
-              <Zap className="w-4 h-4" /> {startingInstant ? 'Starting…' : 'Start Instant Meeting'}
+              <Zap className="w-4 h-4" /> Start Instant Meeting
             </button>
             <button
               onClick={() => setIsAddModalOpen(true)}
@@ -214,12 +236,22 @@ export default function AdminMeetings() {
                     <div className="flex items-center gap-2 text-[13px] font-medium text-gray-600">
                       <Video className="w-4 h-4 text-blue-500" /> {meeting.platform || 'Video Call'}
                     </div>
-                    <button
-                      onClick={() => handleJoin(meeting)}
-                      className="px-4 py-1.5 bg-[#4F46E5] text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
-                    >
-                      Join
-                    </button>
+                    {user?.role === 'admin' || user?.uid === meeting.createdBy || (meeting.participants && meeting.participants.includes(user?.uid || '')) ? (
+                      <button
+                        onClick={() => handleJoin(meeting)}
+                        className="px-4 py-1.5 bg-[#4F46E5] text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
+                      >
+                        Join
+                      </button>
+                    ) : (
+                      <button
+                        disabled
+                        className="px-4 py-1.5 bg-gray-100 text-gray-400 rounded-md text-sm font-medium cursor-not-allowed border border-gray-200"
+                        title="You are not authorized to join this meeting"
+                      >
+                        Not Invited
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -291,18 +323,7 @@ export default function AdminMeetings() {
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Platform</label>
-                <select
-                  value={newMeeting.platform}
-                  onChange={e => setNewMeeting({ ...newMeeting, platform: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700"
-                >
-                  <option>Google Meet</option>
-                  <option>Zoom</option>
-                  <option>Microsoft Teams</option>
-                </select>
-              </div>
+
               <div>
                 <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Meeting Link (optional)</label>
                 <input
@@ -346,6 +367,79 @@ export default function AdminMeetings() {
                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 disabled:opacity-60"
               >
                 {saving ? 'Scheduling…' : 'Schedule Meeting'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Instant Meeting Modal */}
+      {isInstantModalOpen && (
+        <div className="fixed inset-0 bg-gray-900/40 z-[100] flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-[440px] max-h-[85vh] overflow-y-auto border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 sticky top-0">
+              <h3 className="text-sm font-bold text-gray-900">Start Instant Meeting</h3>
+              <button onClick={() => setIsInstantModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div>
+                <h4 className="text-[12px] font-semibold text-gray-900 uppercase tracking-wider mb-2">Invite Teams</h4>
+                {teams.length === 0 ? (
+                  <p className="text-[12px] text-gray-400 italic">No teams available.</p>
+                ) : (
+                  <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                    {teams.map(t => (
+                      <label key={t.id} className="flex items-center gap-3 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedInstantTeams.includes(t.id)}
+                          onChange={() => toggleInstantTeam(t.id)}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="font-medium">{t.name}</span>
+                        {t.department && <span className="ml-auto text-[10px] text-gray-400 uppercase">{t.department}</span>}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h4 className="text-[12px] font-semibold text-gray-900 uppercase tracking-wider mb-2">Invite Individuals</h4>
+                <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                  {allUsers.filter(u => u.id !== user?.uid).map(u => (
+                    <label key={u.id} className="flex items-center gap-3 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedInstantUsers.includes(u.id)}
+                        onChange={() => toggleInstantUser(u.id)}
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span>{u.name || u.email || u.id}</span>
+                      {u.role && <span className="ml-auto text-[10px] text-gray-400 uppercase">{u.role}</span>}
+                    </label>
+                  ))}
+                  {allUsers.length === 0 && (
+                    <p className="px-3 py-2 text-[12px] text-gray-400">No other users found yet.</p>
+                  )}
+                </div>
+              </div>
+
+              {error && <p className="text-[12px] text-red-600">{error}</p>}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 sticky bottom-0">
+              <button onClick={() => setIsInstantModalOpen(false)} className="px-4 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button
+                onClick={executeStartInstantMeeting}
+                disabled={startingInstant}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-2"
+              >
+                <Zap className="w-4 h-4" />
+                {startingInstant ? 'Starting…' : 'Start Meeting Now'}
               </button>
             </div>
           </div>

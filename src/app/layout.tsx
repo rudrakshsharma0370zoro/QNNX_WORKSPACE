@@ -1,5 +1,6 @@
 import './globals.css'
 import { AuthProvider } from '@/components/AuthProvider'
+import { ThemeProvider } from '@/components/ThemeProvider'
 
 export default function RootLayout({
   children,
@@ -7,9 +8,16 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          themes={['light', 'dark', 'reading']}
+        >
+          <AuthProvider>{children}</AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

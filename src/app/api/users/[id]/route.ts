@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireRole, RouteContext, AuthenticatedRequest } from '@/lib/auth';
-import { firestoreAdminUpdate, firestoreAdminSet } from '@/lib/firestoreAdmin';
+import { firestoreAdminUpdate, firestoreAdminSet, firestoreAdminGet } from '@/lib/firestoreAdmin';
 
 // Explicitly define edge execution for Cloudflare compatibility
 export const runtime = 'edge';
@@ -103,6 +103,26 @@ async function updateProfile(
       updates.name = name;
     }
 
+    if (body.avatarUrl !== undefined) {
+      if (typeof body.avatarUrl !== 'string') {
+        return NextResponse.json(
+          { error: 'Bad Request', details: 'Field "avatarUrl" must be a string.' },
+          { status: 400 }
+        );
+      }
+      updates.avatarUrl = body.avatarUrl;
+    }
+
+    if (body.preferences !== undefined) {
+      if (typeof body.preferences !== 'object' || body.preferences === null || Array.isArray(body.preferences)) {
+        return NextResponse.json(
+          { error: 'Bad Request', details: 'Field "preferences" must be an object.' },
+          { status: 400 }
+        );
+      }
+      updates.preferences = body.preferences;
+    }
+
     if (body.personalDetails !== undefined) {
       const pd = body.personalDetails;
       if (typeof pd !== 'object' || pd === null || Array.isArray(pd)) {
@@ -123,7 +143,7 @@ async function updateProfile(
 
     if (Object.keys(updates).length === 0 && privateDetails === null) {
       return NextResponse.json(
-        { error: 'Bad Request', details: 'No editable fields provided (name, personalDetails).' },
+        { error: 'Bad Request', details: 'No editable fields provided (name, avatarUrl, preferences, personalDetails).' },
         { status: 400 }
       );
     }
@@ -171,3 +191,36 @@ async function updateProfile(
 // Any authenticated user may hit this route; per-target authorization happens
 // inside the handler (self or admin).
 export const PATCH = requireRole([], updateProfile);
+
+async function getUserProfile(
+  req: AuthenticatedRequest,
+  context: RouteContext
+): Promise<Response> {
+  try {
+    const params = await context.params;
+    const rawId = params.id;
+    const uid = Array.isArray(rawId) ? rawId[0] : rawId;
+    if (!uid) return NextResponse.json({ error: 'Bad Request' }, { status: 400 });
+
+    const isSelf = req.user.uid === uid;
+    const isAdmin = (req.user.role || 'user') === 'admin';
+    if (!isSelf && !isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    const userDoc = await firestoreAdminGet('users', uid);
+    if (!userDoc) return NextResponse.json({ error: 'Not Found' }, { status: 404 });
+
+    const privateDoc = await firestoreAdminGet(privatePath(uid), PRIVATE_DETAILS_DOC);
+
+    return NextResponse.json({
+      success: true,
+      profile: {
+        ...userDoc,
+        personalDetails: privateDoc || {}
+      }
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export const GET = requireRole([], getUserProfile);

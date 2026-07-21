@@ -96,13 +96,44 @@ export default function AdminOverview() {
   const totalLeads = users.filter(u => u.role === 'lead').length;
   const totalEmployees = users.filter(u => u.role === 'user').length;
 
-  // Bar Chart Data: Projects timeline mock
+  // Dynamic Projects Timeline Data (Starts July 2026)
+  const launchDate = new Date(2026, 6, 1); // July 2026 (month is 0-indexed)
+  const currentDate = new Date();
+  
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  
+  let totalMonths = (currentDate.getFullYear() - launchDate.getFullYear()) * 12 + (currentDate.getMonth() - launchDate.getMonth()) + 1;
+  if (totalMonths < 1) totalMonths = 1;
+
+  const chartLabels: string[] = [];
+  for (let i = 0; i < totalMonths; i++) {
+    const d = new Date(launchDate.getFullYear(), launchDate.getMonth() + i, 1);
+    chartLabels.push(monthNames[d.getMonth()]);
+  }
+
+  const startedData = Array(chartLabels.length).fill(0);
+  const completedData = Array(chartLabels.length).fill(0);
+
+  projects.forEach((p) => {
+    if (!p.createdAt) return;
+    const d = new Date(p.createdAt);
+    
+    const monthDiff = (d.getFullYear() - launchDate.getFullYear()) * 12 + (d.getMonth() - launchDate.getMonth());
+    
+    if (monthDiff >= 0 && monthDiff < totalMonths) {
+      startedData[monthDiff] += 1;
+      if (p.status === 'Completed') {
+        completedData[monthDiff] += 1;
+      }
+    }
+  });
+
   const barChartData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
+    labels: chartLabels,
     datasets: [
       {
         label: 'Projects Started',
-        data: [2, 3, 5, 4, 6, 8, projects.length],
+        data: startedData,
         backgroundColor: '#3b82f6',
         borderRadius: 4,
         barPercentage: 0.5,
@@ -110,7 +141,7 @@ export default function AdminOverview() {
       },
       {
         label: 'Projects Completed',
-        data: [1, 2, 3, 2, 4, 5, 2],
+        data: completedData,
         backgroundColor: '#10b981',
         borderRadius: 4,
         barPercentage: 0.5,
