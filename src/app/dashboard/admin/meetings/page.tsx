@@ -236,7 +236,7 @@ export default function AdminMeetings() {
                     <div className="flex items-center gap-2 text-[13px] font-medium text-gray-600">
                       <Video className="w-4 h-4 text-blue-500" /> {meeting.platform || 'Video Call'}
                     </div>
-                    {user?.role === 'admin' || user?.uid === meeting.createdBy || (meeting.participants && meeting.participants.includes(user?.uid || '')) ? (
+                    {(user as any)?.role === 'admin' || user?.uid === meeting.createdBy || (meeting.participants && meeting.participants.includes(user?.uid || '')) ? (
                       <button
                         onClick={() => handleJoin(meeting)}
                         className="px-4 py-1.5 bg-[#4F46E5] text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
