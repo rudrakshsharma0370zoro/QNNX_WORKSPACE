@@ -86,6 +86,36 @@ export async function getUploadPresignedUrl(
 }
 
 /**
+ * Uploads a JSON object directly to S3 from the server using aws4fetch.
+ * 
+ * @param key - Destination object key in the bucket
+ * @param data - The JSON object payload to upload
+ */
+export async function uploadJsonToS3(key: string, data: Record<string, unknown> | unknown[]): Promise<void> {
+  if (!AWS_S3_BUCKET_NAME) {
+    throw new Error('Configuration Error: AWS_S3_BUCKET_NAME environment variable is not defined.');
+  }
+
+  const endpoint = `https://${AWS_S3_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${key}`;
+
+  try {
+    const response = await getAwsClient().fetch(endpoint, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(`S3 responded ${response.status}: ${body || 'upload failed'}`);
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[S3 Subsystem] Error uploading JSON object:', message);
+    throw new Error(`S3 Upload Failure: ${message}`);
+  }
+}
+
+/**
  * Permanently deletes an object from the bucket.
  *
  * Uses `AwsClient.fetch()` (rather than `.sign()` + a manual fetch) so the

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
@@ -17,6 +17,30 @@ export default function AdminProjects() {
   const [editingProject, setEditingProject] = useState<any | null>(null);
   const [editForm, setEditForm] = useState<{ name: string; deadline: string; status: string; leadId: string; employeeIds: string[] }>({ name: '', deadline: '', status: 'In Progress', leadId: '', employeeIds: [] });
   const [editLoading, setEditLoading] = useState(false);
+  const archivingRef = useRef(false);
+
+  useEffect(() => {
+    if (projects.length > 15 && !archivingRef.current) {
+      const olderProjects = projects.slice(15);
+      const projectIds = olderProjects.map(p => p.id);
+      
+      const archiveProjects = async () => {
+        archivingRef.current = true;
+        try {
+          await fetchWithAuth('/api/projects/archive', {
+            method: 'POST',
+            body: JSON.stringify({ projectIds })
+          });
+        } catch (error) {
+          console.error("Failed to archive projects", error);
+        } finally {
+          archivingRef.current = false;
+        }
+      };
+
+      archiveProjects();
+    }
+  }, [projects]);
 
   useEffect(() => {
     const unsubProjects = onSnapshot(query(collection(db, 'projects')), snapshot => {
@@ -104,7 +128,7 @@ export default function AdminProjects() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {projects.map((project) => {
+          {projects.slice(0, 15).map((project) => {
             const lead = leads.find(l => l.id === project.leadId);
             
             return (

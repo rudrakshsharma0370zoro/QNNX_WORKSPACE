@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireRole } from '@/lib/auth';
-import { firestoreAdminUpdate, firestoreAdminDelete } from '@/lib/firestoreAdmin';
+import { firestoreAdminUpdate, firestoreAdminDelete, firestoreAdminList } from '@/lib/firestoreAdmin';
 
 export const runtime = 'edge';
 
@@ -51,7 +51,15 @@ export const DELETE = requireRole(['admin'], async (req, context) => {
       return NextResponse.json({ error: 'Bad Request', details: 'Missing project id.' }, { status: 400 });
     }
 
-    await firestoreAdminDelete('projects', projectId);
+    // Conditional cascade deletion for Tasks: delete tasks associated with this project.
+    // Standalone tasks without a projectId will be ignored automatically.
+    const allTasks = await firestoreAdminList('tasks');
+    const projectTasks = allTasks.filter((t: any) => t.projectId === projectId);
+    
+    await Promise.all([
+      firestoreAdminDelete('projects', projectId),
+      ...projectTasks.map((t: any) => firestoreAdminDelete('tasks', String(t.id)))
+    ]);
     return NextResponse.json({ success: true, id: projectId });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Operation failed.';
