@@ -4,52 +4,11 @@ import { requireRole } from '@/lib/auth';
 import { firestoreAdminCreate, firestoreAdminUpdate } from '@/lib/firestoreAdmin';
 import { logActivityServer } from '@/lib/activityLog';
 
-import { google } from 'googleapis';
-
 async function generateGoogleMeetLink(title: string, startTime: string): Promise<string | null> {
-  try {
-    const clientEmail = process.env.FIREBASE_SERVICE_ACCOUNT_CLIENT_EMAIL;
-    const privateKey = process.env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
-    if (!clientEmail || !privateKey) {
-      console.warn('Google Service Account credentials missing.');
-      return null;
-    }
-
-    const auth = new google.auth.JWT({
-      email: clientEmail,
-      key: privateKey,
-      scopes: ['https://www.googleapis.com/auth/calendar'],
-    });
-
-    const calendar = google.calendar({ version: 'v3', auth });
-
-    const start = new Date(startTime);
-    const end = new Date(start.getTime() + 60 * 60 * 1000);
-
-    const event = {
-      summary: title,
-      start: { dateTime: start.toISOString() },
-      end: { dateTime: end.toISOString() },
-      conferenceData: {
-        createRequest: {
-          requestId: Math.random().toString(36).substring(2, 12),
-          conferenceSolutionKey: { type: 'hangoutsMeet' }
-        }
-      }
-    };
-
-    const res = await calendar.events.insert({
-      calendarId: 'primary',
-      conferenceDataVersion: 1,
-      requestBody: event,
-    });
-
-    return res.data.hangoutLink || null;
-  } catch (error) {
-    console.error('Failed to generate Google Meet link via Calendar API:', error);
-    return null;
-  }
+  // Google API library relies on Node.js core modules (http/https/net/tls) which are not available in Cloudflare Edge.
+  // Returning a free Jitsi alternative instead.
+  console.warn('Google Meet link generation is disabled in Edge Runtime. Returning a Jitsi alternative.');
+  return `https://meet.jit.si/${Math.random().toString(36).substring(2, 12)}`;
 }
 
 const VALID_MEETING_TYPES = ['scheduled', 'instant'] as const;
