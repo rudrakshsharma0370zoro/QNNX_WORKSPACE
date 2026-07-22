@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireRole, RouteContext, AuthenticatedRequest } from '@/lib/auth';
-import { firestoreAdminUpdate, firestoreAdminSet, firestoreAdminGet, firestoreAdminDelete } from '@/lib/firestoreAdmin';
+import { firestoreAdminUpdate, firestoreAdminSet, firestoreAdminGet, firestoreAdminDelete, encodeSegment } from '@/lib/firestoreAdmin';
 import { deleteAuthUser } from '@/lib/firebaseAuthAdmin';
 
 // Explicitly define edge execution for Cloudflare compatibility
@@ -33,7 +33,10 @@ export const runtime = 'edge';
 
 /** Subcollection path holding a user's private PII document. */
 const PRIVATE_DETAILS_DOC = 'details';
-const privatePath = (uid: string) => `users/${uid}/private`;
+// uid is route-param-controlled, so it must be encoded before being spliced
+// into the Firestore path — otherwise a crafted id could traverse out of
+// the `users` collection (see security review, "Firestore path traversal").
+const privatePath = (uid: string) => `users/${encodeSegment(uid)}/private`;
 
 const MAX_FIELD_LENGTH = 500;
 

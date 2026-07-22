@@ -63,7 +63,8 @@ export default function LeadDocuments() {
         body: JSON.stringify({
           filename: file.name,
           contentType: file.type,
-          category: selectedCategory
+          category: selectedCategory,
+          size: file.size
         })
       });
       

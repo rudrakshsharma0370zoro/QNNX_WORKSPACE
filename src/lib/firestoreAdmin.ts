@@ -31,6 +31,19 @@ function documentsUrl(path: string): string {
 }
 
 /**
+ * Percent-encodes a single path segment (collection name or document id) so
+ * that route-supplied values (e.g. `context.params.id`) can never introduce
+ * extra `/` or `..` segments into the Firestore REST URL. Every call site
+ * that builds a `collection/documentId` path from caller-controlled input
+ * MUST route both pieces through this before concatenation — otherwise a
+ * crafted id like `..%2Fusers%2FvictimUid` can escape the intended
+ * collection (see security review, "Firestore path traversal").
+ */
+export function encodeSegment(segment: string): string {
+  return encodeURIComponent(segment);
+}
+
+/**
  * Maps JS values to Google Firestore REST API field-value formats.
  * Integers are encoded as `integerValue` (not `doubleValue`) so counters and
  * ids round-trip cleanly.
@@ -129,7 +142,7 @@ export async function firestoreAdminUpdate(
   }
 
   const response = await fetch(
-    `${documentsUrl(`${collection}/${documentId}`)}?${params.toString()}`,
+    `${documentsUrl(`${encodeSegment(collection)}/${encodeSegment(documentId)}`)}?${params.toString()}`,
     {
       method: 'PATCH',
       headers: {
@@ -164,7 +177,11 @@ export async function firestoreAdminUpdate(
  * `path` is a full document path relative to the database root, so
  * subcollections are supported: `users/abc123/private`.
  *
- * @param path - Collection path (may be nested, e.g. 'users/{uid}/private')
+ * @param path - Collection path (may be nested, e.g. 'users/{uid}/private').
+ *               If any segment of `path` is caller-controlled (e.g. a uid
+ *               taken from a route param), the caller MUST run it through
+ *               `encodeSegment` before building this string — this function
+ *               only encodes the trailing `documentId`.
  * @param documentId - The ID of the target document
  * @param data - Key-value pairs of fields to merge
  */
@@ -184,7 +201,7 @@ export async function firestoreAdminSet(
   }
 
   const response = await fetch(
-    `${documentsUrl(`${path}/${documentId}`)}?${params.toString()}`,
+    `${documentsUrl(`${path}/${encodeSegment(documentId)}`)}?${params.toString()}`,
     {
       method: 'PATCH',
       headers: {
@@ -244,9 +261,10 @@ export async function firestoreAdminGet(
 ): Promise<Record<string, unknown> | null> {
   const token = await getGoogleAccessToken(GoogleScopes.DATASTORE);
 
-  const response = await fetch(documentsUrl(`${collection}/${documentId}`), {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await fetch(
+    documentsUrl(`${encodeSegment(collection)}/${encodeSegment(documentId)}`),
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
 
   if (response.status === 404) return null;
 
@@ -274,7 +292,7 @@ export async function firestoreAdminCommit(
 ): Promise<void> {
   const token = await getGoogleAccessToken(GoogleScopes.DATASTORE);
   const projectId = requireProjectId();
-  const name = `projects/${projectId}/databases/(default)/documents/${collection}/${documentId}`;
+  const name = `projects/${projectId}/databases/(default)/documents/${encodeSegment(collection)}/${encodeSegment(documentId)}`;
 
   const setKeys = ops.set
     ? Object.keys(ops.set).filter((k) => ops.set![k] !== undefined)
@@ -338,10 +356,13 @@ export async function firestoreAdminDelete(
 ): Promise<void> {
   const token = await getGoogleAccessToken(GoogleScopes.DATASTORE);
 
-  const response = await fetch(documentsUrl(`${collection}/${documentId}`), {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await fetch(
+    documentsUrl(`${encodeSegment(collection)}/${encodeSegment(documentId)}`),
+    {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
 
   if (!response.ok && response.status !== 404) {
     const resData = await response.json().catch(() => ({}));

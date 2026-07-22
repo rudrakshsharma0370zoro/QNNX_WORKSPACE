@@ -78,7 +78,7 @@ export default function AdminTasks() {
       const presignRes = await fetch('/api/uploads/presign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ filename: file.name, contentType: file.type, category: 'task-files' })
+        body: JSON.stringify({ filename: file.name, contentType: file.type, category: 'task-files', size: file.size })
       });
       const presignData = await presignRes.json();
       if (!presignRes.ok) throw new Error(presignData.details || 'Failed to get upload URL');

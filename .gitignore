@@ -1,4 +1,19 @@
 node_modules
 
 .next/
+.env
 .env.local
+.env*.local
+
+# build/type-check caches - no secrets, just churn
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# OS / editor cruft
+.DS_Store
+.vscode/
+.idea/
+
+# Cloudflare local state
+.wrangler/
+.dev.vars

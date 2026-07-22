@@ -8,11 +8,11 @@ export const GET = requireRole(['admin', 'lead', 'user'], async (req) => {
   try {
     const url = new URL(req.url);
     const query = (url.searchParams.get('q') || '').toLowerCase();
-    
+
     if (!query) {
       return NextResponse.json({ success: true, results: { users: [], projects: [], tasks: [] } });
     }
-    
+
     // In a real large-scale application, you would use Algolia or Typesense for full-text search.
     // For now, we perform basic string matching across collections.
     const [users, projects, tasks] = await Promise.all([
@@ -20,22 +20,46 @@ export const GET = requireRole(['admin', 'lead', 'user'], async (req) => {
       firestoreAdminList('projects'),
       firestoreAdminList('tasks')
     ]);
-    
-    const matchedUsers = users.filter((u: any) => 
-      (u.name && u.name.toLowerCase().includes(query)) || 
+
+    // This route reads via the service account, bypassing firestore.rules, so
+    // the same visibility policy those rules would enforce must be re-applied
+    // here. A plain 'user' must only see tasks/projects they're assigned to
+    // or created — otherwise search leaks every task in the org (see security
+    // review: "/api/search leaking all tasks").
+    const role = req.user.role || 'user';
+    const uid = req.user.uid;
+    const isPrivileged = role === 'admin' || role === 'lead';
+
+    const visibleTasks = isPrivileged
+      ? tasks
+      : tasks.filter((t: any) =>
+          t.createdBy === uid ||
+          (Array.isArray(t.assignees) && t.assignees.includes(uid))
+        );
+
+    const visibleProjects = isPrivileged
+      ? projects
+      : projects.filter((p: any) =>
+          p.createdBy === uid ||
+          p.leadId === uid ||
+          (Array.isArray(p.employeeIds) && p.employeeIds.includes(uid))
+        );
+
+    const matchedUsers = users.filter((u: any) =>
+      (u.name && u.name.toLowerCase().includes(query)) ||
       (u.email && u.email.toLowerCase().includes(query))
     );
-    
-    const matchedProjects = projects.filter((p: any) => 
+
+    const matchedProjects = visibleProjects.filter((p: any) =>
       (p.name && p.name.toLowerCase().includes(query)) ||
       (p.description && p.description.toLowerCase().includes(query))
     );
-    
-    const matchedTasks = tasks.filter((t: any) => 
+
+    const matchedTasks = visibleTasks.filter((t: any) =>
       (t.title && t.title.toLowerCase().includes(query)) ||
       (t.description && t.description.toLowerCase().includes(query))
     );
-    
+
     return NextResponse.json({
       success: true,
       results: {

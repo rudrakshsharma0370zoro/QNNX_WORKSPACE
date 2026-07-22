@@ -52,12 +52,19 @@ function getAwsClient(): AwsClient {
  * @param key - Destination object key in the bucket (e.g. 'uploads/uid/file.pdf')
  * @param contentType - MIME type the client will upload with
  * @param expiresIn - URL lifetime in seconds (default: 900 / 15 min)
+ * @param contentLength - When provided, signed as the `Content-Length`
+ *   header, which locks the PUT to exactly this many bytes — S3 rejects any
+ *   upload that doesn't match, since the header is part of the SigV4
+ *   signature. Callers should pass the caller-declared file size (itself
+ *   validated against a max before calling this) to bound upload size (see
+ *   security review, "unrestricted upload content-type/size").
  * @returns The fully-signed presigned URL string
  */
 export async function getUploadPresignedUrl(
   key: string,
   contentType: string,
-  expiresIn = 900
+  expiresIn = 900,
+  contentLength?: number
 ): Promise<string> {
   if (!AWS_S3_BUCKET_NAME) {
     throw new Error(
@@ -71,10 +78,15 @@ export async function getUploadPresignedUrl(
   );
   endpoint.searchParams.set('X-Amz-Expires', String(expiresIn));
 
+  const headers: Record<string, string> = { 'Content-Type': contentType };
+  if (typeof contentLength === 'number' && Number.isFinite(contentLength)) {
+    headers['Content-Length'] = String(contentLength);
+  }
+
   try {
     const signed = await getAwsClient().sign(endpoint.toString(), {
       method: 'PUT',
-      headers: { 'Content-Type': contentType },
+      headers,
       aws: { signQuery: true },
     });
     return signed.url;

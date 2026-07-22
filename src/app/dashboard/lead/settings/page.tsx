@@ -233,7 +233,8 @@ export default function LeadSettings() {
       body: JSON.stringify({
         filename: file.name,
         contentType: file.type,
-        category: category
+        category: category,
+        size: file.size
       })
     });
     
