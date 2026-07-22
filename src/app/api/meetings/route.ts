@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+export const runtime = 'edge';
 import { requireRole } from '@/lib/auth';
 import { firestoreAdminCreate, firestoreAdminUpdate } from '@/lib/firestoreAdmin';
 import { logActivityServer } from '@/lib/activityLog';
