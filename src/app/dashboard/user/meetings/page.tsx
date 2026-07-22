@@ -34,13 +34,11 @@ export default function UserMeetings() {
   }, [user?.uid]);
 
   const handleJoin = (meeting: any) => {
-    // Prefer the real link the organizer set; fall back to a fresh Meet room
-    // only when none was provided (no real video-conferencing API is wired
-    // up yet, so this fallback stays a placeholder).
-    // window.open(meeting.link || 'https://meet.google.com/new', '_blank');
-    // Jitsi fix: joinUrl() falls back to a room named after the meeting id,
-    // so even link-less meetings put every joiner in the SAME room.
-    window.open(joinUrl(meeting), '_blank');
+    if (meeting.link) {
+      window.open(meeting.link, '_blank');
+    } else {
+      alert("No valid Google Meet link was provided for this meeting.");
+    }
   };
 
   return (

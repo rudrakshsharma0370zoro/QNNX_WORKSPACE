@@ -76,8 +76,8 @@ export default function AdminMeetings() {
   };
 
   const handleCreateMeeting = async () => {
-    if (!newMeeting.title.trim() || !newMeeting.date) {
-      setError('Title and date are required.');
+    if (!newMeeting.title.trim() || !newMeeting.date || !newMeeting.link.trim()) {
+      setError('Title, date, and meeting link are required.');
       return;
     }
     setSaving(true);
@@ -325,12 +325,12 @@ export default function AdminMeetings() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Meeting Link (optional)</label>
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Meeting Link (Required)</label>
                 <input
                   type="text"
                   value={newMeeting.link}
                   onChange={e => setNewMeeting({ ...newMeeting, link: e.target.value })}
-                  placeholder="https://..."
+                  placeholder="https://meet.google.com/..."
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 />
               </div>
