@@ -12,8 +12,30 @@ export default function AdminRolesPermissionsRBAC() {
   useEffect(() => {
     const q = query(collection(db, 'users'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setUsers(usersData);
+      let usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+      
+      // Filter out logically deleted users (if a deletedAt or isActive flag exists)
+      usersData = usersData.filter(u => !u.deletedAt && u.isActive !== false);
+
+      // Deduplicate by email, keeping the most recently updated record
+      const uniqueUsersMap = new Map<string, any>();
+      
+      // Sort users by updatedAt descending first, so the most recent is encountered first
+      usersData.sort((a, b) => {
+        const timeA = a.updatedAt?.toMillis ? a.updatedAt.toMillis() : (new Date(a.updatedAt || 0)).getTime();
+        const timeB = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : (new Date(b.updatedAt || 0)).getTime();
+        return timeB - timeA;
+      });
+
+      usersData.forEach(user => {
+        if (!user.email) return;
+        const emailLower = user.email.toLowerCase();
+        if (!uniqueUsersMap.has(emailLower)) {
+          uniqueUsersMap.set(emailLower, user);
+        }
+      });
+
+      setUsers(Array.from(uniqueUsersMap.values()));
     });
     return () => unsubscribe();
   }, []);
@@ -38,7 +60,7 @@ export default function AdminRolesPermissionsRBAC() {
         {/* Header */}
         <div className="flex justify-between items-start mb-8">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Roles & Permissions (RBAC)</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Roles & Permissions</h2>
             <p className="text-sm text-gray-500 mt-1">Assign system roles and manage access control for all users.</p>
           </div>
           <div className="flex items-center gap-3">

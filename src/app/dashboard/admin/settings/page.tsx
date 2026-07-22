@@ -22,16 +22,7 @@ export default function AdminSettings() {
   });
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  // Tab 2: Workspace
-  const [workspace, setWorkspace] = useState({
-    name: '',
-    domain: '',
-    logoUrl: '',
-    timezone: 'Pacific Time (PT)',
-    dateFormat: 'MM/DD/YYYY',
-    currency: 'USD ($)'
-  });
-  const logoInputRef = useRef<HTMLInputElement>(null);
+  // Tab 2: Removed Workspace Preferences
 
   // Tab 3: Notifications
   const [notifications, setNotifications] = useState({
@@ -108,21 +99,7 @@ export default function AdminSettings() {
         }
       }
 
-      const orgRes = await fetch(`/api/organization`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (orgRes.ok) {
-        const orgData = await orgRes.json();
-        if (orgData.success && orgData.organization) {
-          setWorkspace(prev => ({
-            ...prev,
-            ...orgData.organization,
-            name: orgData.organization.name || prev.name,
-            domain: orgData.organization.domain || prev.domain,
-            logoUrl: orgData.organization.logoUrl || prev.logoUrl
-          }));
-        }
-      }
+
     } catch (err) {
       console.error('Failed to fetch settings data', err);
     } finally {
@@ -160,33 +137,7 @@ export default function AdminSettings() {
     }
   };
 
-  const handleSaveWorkspace = async () => {
-    try {
-      setSaving(true);
-      const token = await auth.currentUser?.getIdToken();
-      const res = await fetch(`/api/organization`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          name: workspace.name,
-          domain: workspace.domain,
-          logoUrl: workspace.logoUrl,
-          timezone: workspace.timezone,
-          dateFormat: workspace.dateFormat,
-          currency: workspace.currency
-        })
-      });
-      if (!res.ok) throw new Error('Failed to update workspace');
-      showMessage('Workspace updated successfully!');
-    } catch (err: any) {
-      alert(err.message || 'Save failed');
-    } finally {
-      setSaving(false);
-    }
-  };
+
 
   const savePreferences = async (newPrefs: any) => {
     try {
@@ -332,36 +283,10 @@ export default function AdminSettings() {
     }
   };
 
-  const handleLogoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      setSaving(true);
-      await uploadFile(file, 'company-wide');
-      
-      const objectUrl = URL.createObjectURL(file);
-      setWorkspace(prev => ({ ...prev, logoUrl: objectUrl }));
-      
-      const token = await auth.currentUser?.getIdToken();
-      await fetch(`/api/organization`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ logoUrl: objectUrl })
-      });
-      showMessage('Logo uploaded!');
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
+
 
   const tabs = [
     { id: 'profile', label: 'My Profile', icon: User },
-    { id: 'workspace', label: 'Workspace Preferences', icon: Building },
     { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'security', label: 'Security', icon: Shield },
@@ -505,118 +430,7 @@ export default function AdminSettings() {
               </div>
             )}
 
-            {/* TAB 2: Workspace Preferences */}
-            {activeTab === 'workspace' && (
-              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-1">Workspace Preferences</h3>
-                  <p className="text-sm text-gray-500">Manage your company details and localization settings.</p>
-                </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Left Column */}
-                  <div className="space-y-5">
-                    <div>
-                      <label className="block text-[13px] font-semibold text-gray-700 mb-1">Company Name</label>
-                      <input 
-                        type="text" 
-                        value={workspace.name}
-                        onChange={(e) => setWorkspace({...workspace, name: e.target.value})}
-                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[13px] font-semibold text-gray-700 mb-1">Company Website</label>
-                      <input 
-                        type="url" 
-                        value={workspace.domain}
-                        onChange={(e) => setWorkspace({...workspace, domain: e.target.value})}
-                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" 
-                      />
-                    </div>
-                    <div className="pt-4">
-                      <label className="block text-[13px] font-semibold text-gray-700 mb-2">Company Logo</label>
-                      <input type="file" ref={logoInputRef} onChange={handleLogoSelect} className="hidden" accept="image/*" />
-                      <div 
-                        onClick={() => !saving && logoInputRef.current?.click()}
-                        className={`border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 flex flex-col items-center justify-center py-6 px-4 text-center transition-colors overflow-hidden relative h-32 ${saving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer'}`}
-                      >
-                        {workspace.logoUrl ? (
-                          <img src={workspace.logoUrl} alt="Logo" className="w-full h-full object-contain absolute inset-0 p-2" />
-                        ) : (
-                          <>
-                            <CloudUpload className="w-8 h-8 text-indigo-400 mb-2" />
-                            <p className="text-[13px] font-semibold text-indigo-600">Upload Logo</p>
-                            <p className="text-[11px] text-gray-400 mt-1">Recommended size: 256x256px</p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column */}
-                  <div className="space-y-5">
-                    <div>
-                      <label className="block text-[13px] font-semibold text-gray-700 mb-1">Default Timezone</label>
-                      <div className="relative">
-                        <select 
-                          value={workspace.timezone}
-                          onChange={(e) => setWorkspace({...workspace, timezone: e.target.value})}
-                          className="w-full appearance-none px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        >
-                          <option>Pacific Time (PT)</option>
-                          <option>Eastern Time (ET)</option>
-                          <option>Coordinated Universal Time (UTC)</option>
-                          <option>Central European Time (CET)</option>
-                        </select>
-                        <ChevronDown className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[13px] font-semibold text-gray-700 mb-1">Date Format</label>
-                      <div className="relative">
-                        <select 
-                          value={workspace.dateFormat}
-                          onChange={(e) => setWorkspace({...workspace, dateFormat: e.target.value})}
-                          className="w-full appearance-none px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        >
-                          <option>MM/DD/YYYY</option>
-                          <option>DD/MM/YYYY</option>
-                          <option>YYYY-MM-DD</option>
-                        </select>
-                        <ChevronDown className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[13px] font-semibold text-gray-700 mb-1">Default Currency</label>
-                      <div className="relative">
-                        <select 
-                          value={workspace.currency}
-                          onChange={(e) => setWorkspace({...workspace, currency: e.target.value})}
-                          className="w-full appearance-none px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        >
-                          <option>USD ($)</option>
-                          <option>EUR (€)</option>
-                          <option>GBP (£)</option>
-                        </select>
-                        <ChevronDown className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-gray-100 flex justify-end">
-                  <button 
-                    onClick={handleSaveWorkspace}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50"
-                  >
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save Preferences
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* TAB 3: Appearance */}
             {activeTab === 'appearance' && (

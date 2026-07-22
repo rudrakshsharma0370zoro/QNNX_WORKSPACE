@@ -1,5 +1,5 @@
 import MyProfile from '@/components/MyProfile';
 
-export default function AdminProfilePage() {
+export default function LeadProfilePage() {
   return <MyProfile />;
 }

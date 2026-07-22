@@ -134,7 +134,7 @@ async function updateProfile(
       }
       // Whitelist the sub-fields too; empty strings are allowed (clears a value).
       const details: Record<string, string> = {};
-      for (const key of ['phone', 'address', 'ssn'] as const) {
+      for (const key of ['phone', 'address', 'aadhaarNo'] as const) {
         if (pd[key] !== undefined) {
           details[key] = asTrimmedString(pd[key], `personalDetails.${key}`);
         }
