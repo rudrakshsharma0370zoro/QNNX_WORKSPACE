@@ -1,21 +1,25 @@
 "use client";
-import { useState, useEffect } from 'react';
-import { Edit2, Trash2, X, Plus } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Edit2, Trash2, X, Plus, CloudUpload, Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useAuth } from '@/components/AuthProvider';
+import { auth } from '@/config/firebaseConfig';
 
 export default function AdminTasks() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newTask, setNewTask] = useState({ title: '', projectId: '', priority: 'Medium', assigneeId: '', status: 'Pending' });
+  const [newTask, setNewTask] = useState<{title: string, description: string, projectId: string, priority: string, assignees: string[], status: string, attachments: string[]}>({ title: '', description: '', projectId: '', priority: 'Medium', assignees: [], status: 'Pending', attachments: [] });
   const [loading, setLoading] = useState(false);
   const [editingTask, setEditingTask] = useState<any | null>(null);
-  const [editTaskForm, setEditTaskForm] = useState({ title: '', projectId: '', priority: 'Medium', assigneeId: '' });
+  const [editTaskForm, setEditTaskForm] = useState<{title: string, description: string, projectId: string, priority: string, assignees: string[], attachments: string[]}>({ title: '', description: '', projectId: '', priority: 'Medium', assignees: [], attachments: [] });
   const [editTaskLoading, setEditTaskLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -67,6 +71,28 @@ export default function AdminTasks() {
     } catch(e) { console.error(e); }
   };
 
+  const handleFileUpload = async (file: File) => {
+    try {
+      setUploading(true);
+      const token = await auth.currentUser?.getIdToken();
+      const presignRes = await fetch('/api/uploads/presign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ filename: file.name, contentType: file.type, category: 'task-files' })
+      });
+      const presignData = await presignRes.json();
+      if (!presignRes.ok) throw new Error(presignData.details || 'Failed to get upload URL');
+      const uploadRes = await fetch(presignData.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+      if (!uploadRes.ok) throw new Error('Failed to upload file to S3');
+      return presignData.s3Key;
+    } catch (err: any) {
+      alert(err.message || 'Upload failed');
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleCreateTask = async () => {
     if (!newTask.title) return;
     setLoading(true);
@@ -75,14 +101,15 @@ export default function AdminTasks() {
         method: 'POST',
         body: JSON.stringify({
           title: newTask.title,
-          assignedTo: newTask.assigneeId,
+          description: newTask.description,
+          assignees: newTask.assignees,
           priority: newTask.priority.toLowerCase(),
-          // Passing projectId if we want to save it as part of description or add it to API
           projectId: newTask.projectId,
+          attachments: newTask.attachments,
         }),
       });
       setIsAddModalOpen(false);
-      setNewTask({ title: '', projectId: '', priority: 'Medium', assigneeId: '', status: 'Pending' });
+      setNewTask({ title: '', description: '', projectId: '', priority: 'Medium', assignees: [], status: 'Pending', attachments: [] });
     } catch(e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -97,9 +124,11 @@ export default function AdminTasks() {
     setEditingTask(task);
     setEditTaskForm({
       title: task.title || '',
+      description: task.description || '',
       projectId: task.projectId || '',
       priority: task.priority ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1) : 'Medium',
-      assigneeId: task.assigneeId || '',
+      assignees: Array.isArray(task.assignees) ? task.assignees : (task.assigneeId ? [task.assigneeId] : []),
+      attachments: Array.isArray(task.attachments) ? task.attachments : (task.s3Key ? [task.s3Key] : []),
     });
   };
 
@@ -113,10 +142,12 @@ export default function AdminTasks() {
       // through for every other field.
       const body: Record<string, unknown> = {
         title: editTaskForm.title,
+        description: editTaskForm.description,
         projectId: editTaskForm.projectId || null,
         priority: editTaskForm.priority.toLowerCase(),
+        assignees: editTaskForm.assignees,
+        attachments: editTaskForm.attachments,
       };
-      if (editTaskForm.assigneeId) body.assigneeId = editTaskForm.assigneeId;
 
       await fetchWithAuth(`/api/tasks/${editingTask.id}`, {
         method: 'PATCH',
@@ -228,40 +259,75 @@ export default function AdminTasks() {
               </button>
             </div>
             
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Task Title</label>
-                <input type="text" value={newTask.title} onChange={e => setNewTask({...newTask, title: e.target.value})} placeholder="e.g. Design Login Page" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Project</label>
-                <select value={newTask.projectId} onChange={e => setNewTask({...newTask, projectId: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700">
-                  <option value="">Select Project</option>
-                  {projects.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                 <div>
-                  <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Priority</label>
-                  <select value={newTask.priority} onChange={e => setNewTask({...newTask, priority: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700">
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                  </select>
+                  <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Task Title</label>
+                  <input type="text" value={newTask.title} onChange={e => setNewTask({...newTask, title: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Assign To</label>
-                  <select value={newTask.assigneeId} onChange={e => setNewTask({...newTask, assigneeId: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700">
-                    <option value="">Unassigned</option>
-                    {users.map(e => (
-                      <option key={e.id} value={e.id}>{e.name || e.email}</option>
+                  <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Description</label>
+                  <textarea value={newTask.description} onChange={e => setNewTask({...newTask, description: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 min-h-[80px]" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Project</label>
+                  <select value={newTask.projectId} onChange={e => setNewTask({...newTask, projectId: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700">
+                    <option value="">Select Project</option>
+                    {projects.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                   </select>
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Priority</label>
+                    <select value={newTask.priority} onChange={e => setNewTask({...newTask, priority: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700">
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Assign To</label>
+                    <div className="max-h-[120px] overflow-y-auto bg-white border border-gray-200 rounded-lg p-2 space-y-1">
+                      {users.map(u => (
+                        <label key={u.id} className="flex items-center gap-2 text-[13px] text-gray-700 p-1 hover:bg-gray-50 rounded cursor-pointer">
+                          <input type="checkbox" checked={newTask.assignees.includes(u.id)} onChange={e => {
+                            if (e.target.checked) setNewTask({...newTask, assignees: [...newTask.assignees, u.id]});
+                            else setNewTask({...newTask, assignees: newTask.assignees.filter(id => id !== u.id)});
+                          }} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                          {u.name || u.email}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Attachments</label>
+                  <input type="file" ref={fileInputRef} onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const s3Key = await handleFileUpload(file);
+                      if (s3Key) setNewTask({...newTask, attachments: [...newTask.attachments, s3Key]});
+                    }
+                  }} className="hidden" />
+                  <div 
+                    onClick={() => !uploading && fileInputRef.current?.click()}
+                    className={`border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/50 flex flex-col items-center justify-center py-4 px-4 text-center transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer'}`}
+                  >
+                    {uploading ? (
+                      <Loader2 className="w-5 h-5 text-indigo-400 mb-2 animate-spin" />
+                    ) : (
+                      <CloudUpload className="w-5 h-5 text-indigo-400 mb-2" />
+                    )}
+                    <p className="text-[12px] font-semibold text-indigo-600">{uploading ? 'Uploading...' : 'Click to add attachment'}</p>
+                  </div>
+                  {newTask.attachments.length > 0 && (
+                    <div className="mt-2 text-[12px] text-gray-500">
+                      {newTask.attachments.length} attachment(s) added
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
 
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
               <button onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
@@ -286,10 +352,14 @@ export default function AdminTasks() {
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div>
                 <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Task Title</label>
                 <input type="text" value={editTaskForm.title} onChange={e => setEditTaskForm({...editTaskForm, title: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Description</label>
+                <textarea value={editTaskForm.description} onChange={e => setEditTaskForm({...editTaskForm, description: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 min-h-[80px]" />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Project</label>
@@ -311,13 +381,44 @@ export default function AdminTasks() {
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Assign To</label>
-                  <select value={editTaskForm.assigneeId} onChange={e => setEditTaskForm({...editTaskForm, assigneeId: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700">
-                    <option value="">Unassigned</option>
-                    {users.map(e => (
-                      <option key={e.id} value={e.id}>{e.name || e.email}</option>
+                  <div className="max-h-[120px] overflow-y-auto bg-white border border-gray-200 rounded-lg p-2 space-y-1">
+                    {users.map(u => (
+                      <label key={u.id} className="flex items-center gap-2 text-[13px] text-gray-700 p-1 hover:bg-gray-50 rounded cursor-pointer">
+                        <input type="checkbox" checked={editTaskForm.assignees.includes(u.id)} onChange={e => {
+                          if (e.target.checked) setEditTaskForm({...editTaskForm, assignees: [...editTaskForm.assignees, u.id]});
+                          else setEditTaskForm({...editTaskForm, assignees: editTaskForm.assignees.filter(id => id !== u.id)});
+                        }} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                        {u.name || u.email}
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Attachments</label>
+                <input type="file" ref={editFileInputRef} onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const s3Key = await handleFileUpload(file);
+                    if (s3Key) setEditTaskForm({...editTaskForm, attachments: [...editTaskForm.attachments, s3Key]});
+                  }
+                }} className="hidden" />
+                <div 
+                  onClick={() => !uploading && editFileInputRef.current?.click()}
+                  className={`border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/50 flex flex-col items-center justify-center py-4 px-4 text-center transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer'}`}
+                >
+                  {uploading ? (
+                    <Loader2 className="w-5 h-5 text-indigo-400 mb-2 animate-spin" />
+                  ) : (
+                    <CloudUpload className="w-5 h-5 text-indigo-400 mb-2" />
+                  )}
+                  <p className="text-[12px] font-semibold text-indigo-600">{uploading ? 'Uploading...' : 'Click to add attachment'}</p>
+                </div>
+                {editTaskForm.attachments.length > 0 && (
+                  <div className="mt-2 text-[12px] text-gray-500">
+                    {editTaskForm.attachments.length} attachment(s) added
+                  </div>
+                )}
               </div>
             </div>
 

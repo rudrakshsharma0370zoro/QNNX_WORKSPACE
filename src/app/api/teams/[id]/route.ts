@@ -77,22 +77,8 @@ export const PATCH = requireRole(['admin', 'lead'], async (req: AuthenticatedReq
     updates.updatedAt = new Date();
     await firestoreAdminUpdate('teams', teamId, updates);
 
-    // Sync teamId to users' documents (best effort)
-    if (newMembers.length > 0 || oldMembers.length > 0) {
-      const added = newMembers.filter(uid => !oldMembers.includes(uid));
-      const removed = oldMembers.filter(uid => !newMembers.includes(uid));
-
-      const syncPromises = [];
-      for (const uid of added) {
-        syncPromises.push(firestoreAdminUpdate('users', uid, { team: teamId }).catch(e => console.error(`Failed to sync team for user ${uid}`, e)));
-      }
-      for (const uid of removed) {
-        // We only clear the team if they were on this team. We don't have atomic conditional updates here, 
-        // so we'll just set it to null assuming they are purely being removed from this team.
-        syncPromises.push(firestoreAdminUpdate('users', uid, { team: null }).catch(e => console.error(`Failed to clear team for user ${uid}`, e)));
-      }
-      await Promise.allSettled(syncPromises);
-    }
+    // We no longer sync `teamId` to `user.team` (1-to-many override)
+    // The Teams schema natively supports many-to-many via the `members` array.
 
     return NextResponse.json({ success: true, updated: Object.keys(updates) });
   } catch (error: unknown) {
@@ -124,12 +110,7 @@ export const DELETE = requireRole(['admin'], async (req: AuthenticatedRequest, c
     
     await firestoreAdminDelete('teams', teamId);
 
-    if (currentTeam && Array.isArray(currentTeam.members)) {
-      const syncPromises = currentTeam.members.map((uid: string) => 
-        firestoreAdminUpdate('users', uid, { team: null }).catch(e => console.error(`Failed to clear team for user ${uid}`, e))
-      );
-      await Promise.allSettled(syncPromises);
-    }
+    // We no longer clear `user.team` since we use the native `members` array for many-to-many relationships.
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

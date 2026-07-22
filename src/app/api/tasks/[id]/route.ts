@@ -13,7 +13,7 @@ export const runtime = 'edge';
 const VALID_STATUSES = ['Pending', 'In Progress', 'Completed'] as const;
 const VALID_PRIORITIES = ['low', 'medium', 'high'] as const;
 // Fields only a lead/admin may edit (everyone may change status / add comments).
-const PRIVILEGED_FIELDS = ['title', 'description', 'priority', 'dueDate', 'assigneeId', 'projectId'] as const;
+const PRIVILEGED_FIELDS = ['title', 'description', 'priority', 'dueDate', 'assignees', 'projectId', 'attachments'] as const;
 
 function randomId(): string {
   return Math.random().toString(36).substring(2, 10);
@@ -47,8 +47,11 @@ export const PATCH = requireRole(['user', 'lead', 'admin'], async (req, context)
     const body = await req.json().catch(() => ({}));
 
     // Normalize frontend payload discrepancies
-    if (body.assignedTo !== undefined && body.assigneeId === undefined) {
-      body.assigneeId = body.assignedTo;
+    if (body.assignedTo !== undefined && body.assignees === undefined) {
+      body.assignees = Array.isArray(body.assignedTo) ? body.assignedTo : [body.assignedTo];
+    }
+    if (body.assigneeId !== undefined && body.assignees === undefined) {
+      body.assignees = [body.assigneeId];
     }
     if (body.priority !== undefined && typeof body.priority === 'string') {
       body.priority = body.priority.toLowerCase();
@@ -72,7 +75,7 @@ export const PATCH = requireRole(['user', 'lead', 'admin'], async (req, context)
 
     const role = req.user.role || 'user';
     const isPrivileged = role === 'lead' || role === 'admin';
-    const isAssignee = task.assigneeId === req.user.uid;
+    const isAssignee = (Array.isArray(task.assignees) && task.assignees.includes(req.user.uid)) || task.assigneeId === req.user.uid;
     if (!isPrivileged && !isAssignee) {
       return NextResponse.json(
         { error: 'Forbidden', details: 'You can only update tasks assigned to you.' },
@@ -156,14 +159,17 @@ export const PATCH = requireRole(['user', 'lead', 'admin'], async (req, context)
         set.priority = body.priority;
       }
       if (body.dueDate !== undefined) set.dueDate = body.dueDate ? String(body.dueDate) : null;
-      if (body.assigneeId !== undefined) {
-        if (typeof body.assigneeId !== 'string' || body.assigneeId.trim() === '') {
+      if (body.assignees !== undefined) {
+        if (!Array.isArray(body.assignees) || body.assignees.length === 0) {
           return NextResponse.json(
-            { error: 'Bad Request', details: '"assigneeId" cannot be empty.' },
+            { error: 'Bad Request', details: '"assignees" must be a non-empty array.' },
             { status: 400 }
           );
         }
-        set.assigneeId = body.assigneeId.trim();
+        set.assignees = body.assignees.map(id => String(id).trim());
+      }
+      if (body.attachments !== undefined) {
+        set.attachments = Array.isArray(body.attachments) ? body.attachments.map(a => String(a).trim()) : [];
       }
       if (body.projectId !== undefined) set.projectId = body.projectId ? String(body.projectId).trim() : null;
     }

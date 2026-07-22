@@ -25,14 +25,17 @@ export const POST = requireRole(['admin', 'lead'], async (req) => {
     const body = await req.json().catch(() => ({}));
 
     // Normalize frontend payload discrepancies
-    if (body.assignedTo !== undefined && body.assigneeId === undefined) {
-      body.assigneeId = body.assignedTo;
+    if (body.assignedTo !== undefined && body.assignees === undefined) {
+      body.assignees = Array.isArray(body.assignedTo) ? body.assignedTo : [body.assignedTo];
+    }
+    if (body.assigneeId !== undefined && body.assignees === undefined) {
+      body.assignees = [body.assigneeId];
     }
     if (body.priority !== undefined && typeof body.priority === 'string') {
       body.priority = body.priority.toLowerCase();
     }
 
-    const { title, description, assigneeId, priority, dueDate, s3Key, projectId } = body;
+    const { title, description, assignees, priority, dueDate, attachments, projectId } = body;
 
     // --- Validation ---
     if (!title || typeof title !== 'string' || title.trim() === '') {
@@ -42,9 +45,9 @@ export const POST = requireRole(['admin', 'lead'], async (req) => {
       );
     }
 
-    if (!assigneeId || typeof assigneeId !== 'string' || assigneeId.trim() === '') {
+    if (!assignees || !Array.isArray(assignees) || assignees.length === 0) {
       return NextResponse.json(
-        { error: 'Bad Request', details: 'Field "assigneeId" (assignee uid) is required.' },
+        { error: 'Bad Request', details: 'Field "assignees" (array of uids) is required.' },
         { status: 400 }
       );
     }
@@ -64,13 +67,12 @@ export const POST = requireRole(['admin', 'lead'], async (req) => {
     const taskId = await firestoreAdminCreate('tasks', {
       title: title.trim(),
       description: description ? String(description).trim() : '',
-      assigneeId: assigneeId.trim(),
+      assignees: assignees.map(id => String(id).trim()),
       status: 'Pending',
       priority: (priority as Priority) ?? 'medium',
       dueDate: dueDate ? String(dueDate) : null,
       projectId: projectId ? String(projectId).trim() : null,
-      // Optional pointer to an uploaded attachment in S3.
-      s3Key: s3Key ? String(s3Key).trim() : null,
+      attachments: Array.isArray(attachments) ? attachments.map(a => String(a).trim()) : [],
       createdBy: req.user.uid,
       createdAt: now,
       updatedAt: now,

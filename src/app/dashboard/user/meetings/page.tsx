@@ -58,9 +58,9 @@ export default function UserMeetings() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {meetings.map((meeting) => (
-              <div key={meeting.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between h-48 hover:border-indigo-300 transition-colors">
+              <div key={meeting.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between h-full min-h-[12rem] hover:border-indigo-300 transition-colors">
                 <div>
-                  <h4 className="font-bold text-gray-900">{meeting.title}</h4>
+                  <h4 className="font-bold text-gray-900 line-clamp-2 break-words">{meeting.title}</h4>
                   <span className="inline-block mt-1 px-2 py-0.5 text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded uppercase">
                     {meeting.type === 'instant' ? 'Instant' : 'Scheduled'}
                   </span>
