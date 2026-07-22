@@ -3,28 +3,32 @@ import { useState, useEffect } from 'react';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
-import { Briefcase, ChevronRight, Filter, Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Briefcase, ChevronRight, Filter, Plus, Edit2, Trash2, X, Users } from 'lucide-react';
 import Link from 'next/link';
+import MemberSelect from '@/components/MemberSelect';
 
 export default function AdminProjects() {
   const [projects, setProjects] = useState<any[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
+  const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newProject, setNewProject] = useState({ name: '', deadline: '', status: 'In Progress', leadId: '' });
+  const [newProject, setNewProject] = useState<{ name: string; deadline: string; status: string; leadId: string; employeeIds: string[] }>({ name: '', deadline: '', status: 'In Progress', leadId: '', employeeIds: [] });
   const [loading, setLoading] = useState(false);
   const [editingProject, setEditingProject] = useState<any | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', deadline: '', status: 'In Progress', leadId: '' });
+  const [editForm, setEditForm] = useState<{ name: string; deadline: string; status: string; leadId: string; employeeIds: string[] }>({ name: '', deadline: '', status: 'In Progress', leadId: '', employeeIds: [] });
   const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     const unsubProjects = onSnapshot(query(collection(db, 'projects')), snapshot => {
       setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    const unsubLeads = onSnapshot(query(collection(db, 'users')), snapshot => {
+    const unsubUsers = onSnapshot(query(collection(db, 'users')), snapshot => {
       const allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setLeads(allUsers.filter((u: any) => u.role === 'lead'));
+      // Members can be any active employee or lead (not pending signups or admins).
+      setAssignableUsers(allUsers.filter((u: any) => u.role === 'user' || u.role === 'lead'));
     });
-    return () => { unsubProjects(); unsubLeads(); };
+    return () => { unsubProjects(); unsubUsers(); };
   }, []);
 
   const handleCreateProject = async () => {
@@ -36,7 +40,7 @@ export default function AdminProjects() {
         body: JSON.stringify(newProject),
       });
       setIsAddModalOpen(false);
-      setNewProject({ name: '', deadline: '', status: 'In Progress', leadId: '' });
+      setNewProject({ name: '', deadline: '', status: 'In Progress', leadId: '', employeeIds: [] });
     } catch (e) {
       console.error(e);
     } finally {
@@ -57,6 +61,7 @@ export default function AdminProjects() {
       deadline: project.deadline || '',
       status: project.status || 'In Progress',
       leadId: project.leadId || '',
+      employeeIds: Array.isArray(project.employeeIds) ? project.employeeIds : [],
     });
   };
 
@@ -124,9 +129,13 @@ export default function AdminProjects() {
                     <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-600">
                       {lead?.name ? lead.name.charAt(0).toUpperCase() : '?'}
                     </div>
-                    <span className="text-[11px] font-semibold text-gray-600 truncate max-w-[100px]">{lead?.name}</span>
+                    <span className="text-[11px] font-semibold text-gray-600 truncate max-w-[70px]">{lead?.name}</span>
+                    <span className="flex items-center gap-1 text-[11px] font-medium text-gray-400" title="Assigned members">
+                      <Users className="w-3.5 h-3.5" />
+                      {Array.isArray(project.employeeIds) ? project.employeeIds.length : 0}
+                    </span>
                   </div>
-                  
+
                   {/* Action Buttons */}
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => openEditModal(project)} className="p-1.5 bg-gray-50 hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 rounded transition-colors" title="Edit / Update Status">
@@ -185,6 +194,11 @@ export default function AdminProjects() {
                   ))}
                 </select>
               </div>
+              <MemberSelect
+                users={assignableUsers}
+                selected={newProject.employeeIds}
+                onChange={(ids) => setNewProject({ ...newProject, employeeIds: ids })}
+              />
             </div>
 
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
@@ -240,6 +254,11 @@ export default function AdminProjects() {
                   ))}
                 </select>
               </div>
+              <MemberSelect
+                users={assignableUsers}
+                selected={editForm.employeeIds}
+                onChange={(ids) => setEditForm({ ...editForm, employeeIds: ids })}
+              />
             </div>
 
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">

@@ -4,40 +4,48 @@ import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { useAuth } from '@/components/AuthProvider';
-import { Briefcase, X } from 'lucide-react';
+import { Briefcase, Users, X } from 'lucide-react';
+import MemberSelect from '@/components/MemberSelect';
 
 const STATUS_OPTIONS = ['Pending', 'In Progress', 'Completed'];
 
 export default function LeadProjects() {
   const { user } = useAuth();
   const [allProjects, setAllProjects] = useState<any[]>([]);
+  const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
   const [updatingProject, setUpdatingProject] = useState<any | null>(null);
   const [statusValue, setStatusValue] = useState('In Progress');
+  const [memberIds, setMemberIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, 'projects')), snapshot => {
       setAllProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => unsub();
+    const unsubUsers = onSnapshot(query(collection(db, 'users')), snapshot => {
+      const allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAssignableUsers(allUsers.filter((u: any) => u.role === 'user' || u.role === 'lead'));
+    });
+    return () => { unsub(); unsubUsers(); };
   }, []);
 
-  // A lead only manages the status of projects they're assigned to lead —
-  // matches how tasks/meetings scope a lead's own dashboard elsewhere in the app.
+  // A lead manages the projects they're assigned to lead — matches how
+  // tasks/meetings scope a lead's own dashboard elsewhere in the app.
   const projects = allProjects.filter((p: any) => p.leadId === user?.uid);
 
-  const openStatusModal = (project: any) => {
+  const openManageModal = (project: any) => {
     setUpdatingProject(project);
     setStatusValue(project.status || 'In Progress');
+    setMemberIds(Array.isArray(project.employeeIds) ? project.employeeIds : []);
   };
 
-  const handleUpdateStatus = async () => {
+  const handleSave = async () => {
     if (!updatingProject) return;
     setSaving(true);
     try {
       await fetchWithAuth(`/api/projects/${updatingProject.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ status: statusValue }),
+        body: JSON.stringify({ status: statusValue, employeeIds: memberIds }),
       });
       setUpdatingProject(null);
     } catch (e) {
@@ -53,7 +61,7 @@ export default function LeadProjects() {
 
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900">My Projects</h2>
-          <p className="text-sm text-gray-500 mt-1">Projects you lead. Update their status as work progresses.</p>
+          <p className="text-sm text-gray-500 mt-1">Projects you lead. Update their status and manage who&apos;s on the team.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -74,12 +82,16 @@ export default function LeadProjects() {
                 <p className="text-[12px] text-gray-500 font-medium">Deadline: {project.deadline ? new Date(project.deadline).toLocaleDateString() : 'No deadline'}</p>
               </div>
 
-              <div className="pt-4 border-t border-gray-100 mt-4 flex items-center justify-end">
+              <div className="pt-4 border-t border-gray-100 mt-4 flex items-center justify-between">
+                <span className="flex items-center gap-1 text-[11px] font-medium text-gray-400" title="Assigned members">
+                  <Users className="w-3.5 h-3.5" />
+                  {Array.isArray(project.employeeIds) ? project.employeeIds.length : 0} members
+                </span>
                 <button
-                  onClick={() => openStatusModal(project)}
+                  onClick={() => openManageModal(project)}
                   className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-[11px] font-bold rounded-md transition-colors"
                 >
-                  Update Status
+                  Manage
                 </button>
               </div>
             </div>
@@ -100,7 +112,7 @@ export default function LeadProjects() {
           <div className="bg-white rounded-xl shadow-xl w-[400px] border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
               <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-indigo-600" /> Update Status
+                <Briefcase className="w-4 h-4 text-indigo-600" /> Manage Project
               </h3>
               <button onClick={() => setUpdatingProject(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
                 <X className="w-4 h-4" />
@@ -117,13 +129,19 @@ export default function LeadProjects() {
                   ))}
                 </select>
               </div>
+              <MemberSelect
+                users={assignableUsers}
+                selected={memberIds}
+                onChange={setMemberIds}
+                label="Project Members"
+              />
             </div>
 
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
               <button onClick={() => setUpdatingProject(null)} className="px-4 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
                 Cancel
               </button>
-              <button onClick={handleUpdateStatus} disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 transition-colors">
+              <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 transition-colors">
                 Save
               </button>
             </div>
