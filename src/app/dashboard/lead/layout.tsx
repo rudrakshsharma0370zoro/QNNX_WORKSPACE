@@ -1,7 +1,7 @@
 "use client";
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Bell, Settings, LogOut, Briefcase } from 'lucide-react';
 
@@ -9,6 +9,7 @@ export default function LeadLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const router = useRouter();
   const { user, role, loading, logout } = useAuth();
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
   
   useEffect(() => {
     if (!loading && (!user || role !== 'lead')) {
@@ -72,10 +73,23 @@ export default function LeadLayout({ children }: { children: React.ReactNode }) 
         {/* Top Header */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-end px-8">
           <div className="flex items-center gap-6">
-            <button className="relative text-gray-500 hover:text-gray-700">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            {/* Notifications Dropdown */}
+            <div className="relative">
+              <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="relative text-gray-500 hover:text-gray-700">
+                <Bell className="w-5 h-5" />
+                <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+              </button>
+              {isNotifOpen && (
+                <div className="absolute right-0 mt-3 w-72 bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
+                  <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center">
+                    <span className="text-sm font-bold text-gray-900">Notifications</span>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    <p className="px-4 py-6 text-[12px] text-gray-500 text-center">No new notifications.</p>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="text-sm font-medium text-gray-900">Lead User</p>
