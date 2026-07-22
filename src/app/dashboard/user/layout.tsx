@@ -24,7 +24,6 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   }, [user, role, loading, router]);
 
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   // Draft state for the Edit Profile modal, seeded from the real signed-in
@@ -70,6 +69,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
     { name: 'My Tasks', href: '/dashboard/user/tasks', icon: CheckSquare },
     { name: 'Meetings', href: '/dashboard/user/meetings', icon: CalendarDays },
     { name: 'Documents', href: '/dashboard/user/documents', icon: FolderOpen },
+    { name: 'Settings', href: '/dashboard/user/settings', icon: Settings },
   ];
 
   if (loading || !user || role !== 'user') {
@@ -130,23 +130,9 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4 border-r border-gray-200 pr-6 relative">
               
-              {/* Settings Dropdown */}
-              <div className="relative">
-                <button onClick={() => {setIsSettingsOpen(!isSettingsOpen); setIsNotifOpen(false);}} className="text-gray-400 hover:text-gray-600 transition-colors" title="Settings">
-                  <Settings className="w-5 h-5" />
-                </button>
-                {isSettingsOpen && (
-                  <div className="absolute right-0 mt-3 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
-                    <button className="w-full text-left px-4 py-2 text-[13px] text-gray-700 hover:bg-gray-50">Account Settings</button>
-                    <button className="w-full text-left px-4 py-2 text-[13px] text-gray-700 hover:bg-gray-50">Preferences</button>
-                    <button className="w-full text-left px-4 py-2 text-[13px] text-gray-700 hover:bg-gray-50">Theme Options</button>
-                  </div>
-                )}
-              </div>
-
               {/* Notifications Dropdown */}
               <div className="relative">
-                <button onClick={() => {setIsNotifOpen(!isNotifOpen); setIsSettingsOpen(false);}} className="relative text-gray-400 hover:text-gray-600 transition-colors" title="Notifications">
+                <button onClick={() => {setIsNotifOpen(!isNotifOpen);}} className="relative text-gray-400 hover:text-gray-600 transition-colors" title="Notifications">
                   <Bell className="w-5 h-5" />
                   <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
                 </button>

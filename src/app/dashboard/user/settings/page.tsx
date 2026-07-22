@@ -5,7 +5,7 @@ import { auth } from '@/config/firebaseConfig';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { useTheme } from 'next-themes';
 
-export default function LeadSettings() {
+export default function UserSettings() {
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

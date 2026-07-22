@@ -4,6 +4,7 @@ import {
   Users, Calendar, ChevronDown, ClipboardList, 
   Hourglass, CheckCircle2, Target, AlertTriangle
 } from 'lucide-react';
+import Link from 'next/link';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { useState, useEffect } from 'react';
@@ -25,6 +26,8 @@ export default function LeadDashboard() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [meetings, setMeetings] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [timeFilter, setTimeFilter] = useState<'all' | 'week'>('all');
 
   useEffect(() => {
     const unsubTasks = onSnapshot(query(collection(db, 'tasks')), snapshot => {
@@ -33,25 +36,49 @@ export default function LeadDashboard() {
     const unsubMeetings = onSnapshot(query(collection(db, 'meetings'), orderBy('date', 'desc'), limit(5)), snapshot => {
       setMeetings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    // The backend writes each entry with `createdAt`, not `timestamp` —
-    // ordering by the wrong field silently excludes every real document.
     const unsubLogs = onSnapshot(query(collection(db, 'activityLog'), orderBy('createdAt', 'desc'), limit(10)), snapshot => {
       setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => { unsubTasks(); unsubMeetings(); unsubLogs(); };
+    const unsubUsers = onSnapshot(query(collection(db, 'users')), snapshot => {
+      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => { unsubTasks(); unsubMeetings(); unsubLogs(); unsubUsers(); };
   }, []);
 
-  const completedTasks = tasks.filter(t => t.status === 'Completed').length;
-  const inProgressTasks = tasks.filter(t => t.status === 'In Progress').length;
-  const pendingTasks = tasks.filter(t => t.status === 'Pending').length;
+  // Apply time filter
+  const filteredTasks = tasks.filter(t => {
+    if (timeFilter === 'all') return true;
+    if (!t.createdAt) return false;
+    const date = typeof t.createdAt.toDate === 'function' ? t.createdAt.toDate() : new Date(t.createdAt);
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    return date >= oneWeekAgo;
+  });
 
-  // Bar Chart Data
+  const completedTasks = filteredTasks.filter(t => t.status === 'Completed').length;
+  const inProgressTasks = filteredTasks.filter(t => t.status === 'In Progress').length;
+  const pendingTasks = filteredTasks.filter(t => t.status === 'Pending').length;
+  const activeTeamMembers = users.filter(u => u.role === 'user').length;
+
+  // Dynamic Bar Chart Data Grouping
+  const getDayCounts = (tasksArray: any[], targetStatus: string) => {
+    const days = [0, 0, 0, 0, 0, 0, 0]; // Mon-Sun
+    tasksArray.filter(t => t.status === targetStatus).forEach(t => {
+      if (!t.createdAt) return;
+      const date = typeof t.createdAt.toDate === 'function' ? t.createdAt.toDate() : new Date(t.createdAt);
+      let dayIndex = date.getDay() - 1;
+      if (dayIndex === -1) dayIndex = 6;
+      days[dayIndex]++;
+    });
+    return days;
+  };
+
   const barChartData = {
     labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     datasets: [
       {
         label: 'Completed',
-        data: [35, 26, 42, 45, 38, 28, 18],
+        data: getDayCounts(filteredTasks, 'Completed'),
         backgroundColor: '#3b82f6',
         borderRadius: 4,
         barPercentage: 0.5,
@@ -59,7 +86,7 @@ export default function LeadDashboard() {
       },
       {
         label: 'In Progress',
-        data: [15, 10, 15, 20, 12, 7, 6],
+        data: getDayCounts(filteredTasks, 'In Progress'),
         backgroundColor: '#10b981',
         borderRadius: 4,
         barPercentage: 0.5,
@@ -72,15 +99,13 @@ export default function LeadDashboard() {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: {
-        display: false, 
-      }
+      legend: { display: false }
     },
     scales: {
       y: {
         beginAtZero: true,
         grid: { color: '#f3f4f6', drawBorder: false },
-        ticks: { stepSize: 10, font: { size: 11 }, color: '#9ca3af' },
+        ticks: { stepSize: 5, font: { size: 11 }, color: '#9ca3af' },
         border: { display: false }
       },
       x: {
@@ -92,12 +117,13 @@ export default function LeadDashboard() {
   };
 
   // Doughnut Chart Data
+  const totalTasks = filteredTasks.length;
   const doughnutData = {
-    labels: ['Completed', 'In Progress', 'Overdue'],
+    labels: ['Completed', 'In Progress', 'Pending'],
     datasets: [
       {
-        data: [completedTasks || 59, inProgressTasks || 41, pendingTasks || 8],
-        backgroundColor: ['#10b981', '#3b82f6', '#ef4444'],
+        data: totalTasks === 0 ? [1] : [completedTasks, inProgressTasks, pendingTasks],
+        backgroundColor: totalTasks === 0 ? ['#f3f4f6'] : ['#10b981', '#3b82f6', '#ef4444'],
         borderWidth: 0,
         cutout: '75%',
       },
@@ -109,9 +135,27 @@ export default function LeadDashboard() {
     maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
-      tooltip: { enabled: false }
+      tooltip: { enabled: totalTasks > 0 }
     }
   };
+
+  // Calculate Top Team Members dynamically
+  const userTaskCounts: Record<string, number> = {};
+  filteredTasks.forEach(t => {
+    if (t.assigneeId) {
+      userTaskCounts[t.assigneeId] = (userTaskCounts[t.assigneeId] || 0) + 1;
+    }
+  });
+  
+  const topTeamMembers = users
+    .filter(u => u.role === 'user')
+    .map(u => ({
+      id: u.id,
+      name: u.name || 'Unknown User',
+      tasks: userTaskCounts[u.id] || 0,
+    }))
+    .sort((a, b) => b.tasks - a.tasks)
+    .slice(0, 4);
 
   return (
     <div className="font-sans text-gray-800 bg-gray-50/30 p-6 lg:p-8 min-h-full w-full">
@@ -123,10 +167,16 @@ export default function LeadDashboard() {
             <h2 className="text-2xl font-bold text-gray-900">Dashboard Overview</h2>
             <p className="text-sm text-gray-500 mt-1">Track your team's performance and key activities.</p>
           </div>
-          <div className="flex items-center gap-4">
-            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
-              This Week <ChevronDown className="w-4 h-4" />
-            </button>
+          <div className="flex items-center gap-4 relative">
+            <select 
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value as 'all' | 'week')}
+              className="appearance-none flex items-center gap-2 px-4 py-2 pr-10 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="all">All Time</option>
+              <option value="week">This Week</option>
+            </select>
+            <ChevronDown className="w-4 h-4 absolute right-3 pointer-events-none text-gray-500" />
           </div>
         </div>
 
@@ -140,8 +190,8 @@ export default function LeadDashboard() {
               <p className="text-sm font-medium text-gray-500">Team Members</p>
             </div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">12</h3>
-              <p className="text-xs text-green-500 font-medium mt-1">Active</p>
+              <h3 className="text-2xl font-bold text-gray-900">{activeTeamMembers}</h3>
+              <p className="text-xs text-green-500 font-medium mt-1">Active Accounts</p>
             </div>
           </div>
 
@@ -153,8 +203,8 @@ export default function LeadDashboard() {
               <p className="text-sm font-medium text-gray-500">Tasks Assigned</p>
             </div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">{tasks.length || 58}</h3>
-              <p className="text-xs text-green-500 font-medium mt-1">↑ 12% vs last week</p>
+              <h3 className="text-2xl font-bold text-gray-900">{totalTasks}</h3>
+              <p className="text-xs text-gray-400 font-medium mt-1">Total in workspace</p>
             </div>
           </div>
 
@@ -166,8 +216,10 @@ export default function LeadDashboard() {
               <p className="text-sm font-medium text-gray-500">Tasks In Progress</p>
             </div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">{inProgressTasks || 24}</h3>
-              <p className="text-xs text-gray-400 font-medium mt-1">41% of total</p>
+              <h3 className="text-2xl font-bold text-gray-900">{inProgressTasks}</h3>
+              <p className="text-xs text-gray-400 font-medium mt-1">
+                {totalTasks > 0 ? Math.round((inProgressTasks / totalTasks) * 100) : 0}% of total
+              </p>
             </div>
           </div>
 
@@ -179,8 +231,10 @@ export default function LeadDashboard() {
               <p className="text-sm font-medium text-gray-500">Tasks Completed</p>
             </div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">{completedTasks || 34}</h3>
-              <p className="text-xs text-green-500 font-medium mt-1">↑ 15% vs last week</p>
+              <h3 className="text-2xl font-bold text-gray-900">{completedTasks}</h3>
+              <p className="text-xs text-gray-400 font-medium mt-1">
+                {totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}% of total
+              </p>
             </div>
           </div>
 
@@ -189,11 +243,13 @@ export default function LeadDashboard() {
               <div className="p-2 bg-red-50 text-red-500 rounded-lg">
                 <Target className="w-5 h-5" />
               </div>
-              <p className="text-sm font-medium text-gray-500">Overdue Tasks</p>
+              <p className="text-sm font-medium text-gray-500">Pending Tasks</p>
             </div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">{pendingTasks || 5}</h3>
-              <p className="text-xs text-red-500 font-medium mt-1">↓ 5% vs last week</p>
+              <h3 className="text-2xl font-bold text-gray-900">{pendingTasks}</h3>
+              <p className="text-xs text-gray-400 font-medium mt-1">
+                {totalTasks > 0 ? Math.round((pendingTasks / totalTasks) * 100) : 0}% of total
+              </p>
             </div>
           </div>
         </div>
@@ -210,13 +266,14 @@ export default function LeadDashboard() {
                   <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"></div> Completed</span>
                   <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-green-500"></div> In Progress</span>
                 </div>
-                <button className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600">
-                  This Week <ChevronDown className="w-3 h-3" />
-                </button>
               </div>
             </div>
-            <div className="h-64 w-full">
-              <Bar data={barChartData} options={barChartOptions} />
+            <div className="h-64 w-full flex items-center justify-center">
+              {totalTasks === 0 ? (
+                <p className="text-sm text-gray-400">No task data available.</p>
+              ) : (
+                <Bar data={barChartData} options={barChartOptions} />
+              )}
             </div>
           </div>
 
@@ -224,14 +281,14 @@ export default function LeadDashboard() {
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-bold text-gray-900">Task Progress</h3>
-              <span className="text-xs text-blue-600 font-medium cursor-pointer hover:underline">See all</span>
+              <Link href="/dashboard/lead/tasks" className="text-xs text-blue-600 font-medium cursor-pointer hover:underline">See all</Link>
             </div>
             
             <div className="flex-1 flex items-center justify-center gap-8">
               <div className="relative w-36 h-36">
                 <Doughnut data={doughnutData} options={doughnutOptions} />
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-3xl font-bold text-gray-900">{tasks.length || 58}</span>
+                  <span className="text-3xl font-bold text-gray-900">{totalTasks}</span>
                   <span className="text-[10px] text-gray-500">Total Tasks</span>
                 </div>
               </div>
@@ -242,21 +299,27 @@ export default function LeadDashboard() {
                     <div className="w-2 h-2 rounded-full bg-green-500"></div>
                     <span className="text-xs font-medium text-gray-700">Completed</span>
                   </div>
-                  <span className="text-xs text-gray-500 ml-4">{completedTasks || 34} (59%)</span>
+                  <span className="text-xs text-gray-500 ml-4">
+                    {completedTasks} ({totalTasks > 0 ? Math.round((completedTasks/totalTasks)*100) : 0}%)
+                  </span>
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
                     <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                     <span className="text-xs font-medium text-gray-700">In Progress</span>
                   </div>
-                  <span className="text-xs text-gray-500 ml-4">{inProgressTasks || 24} (41%)</span>
+                  <span className="text-xs text-gray-500 ml-4">
+                    {inProgressTasks} ({totalTasks > 0 ? Math.round((inProgressTasks/totalTasks)*100) : 0}%)
+                  </span>
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
                     <div className="w-2 h-2 rounded-full bg-red-500"></div>
                     <span className="text-xs font-medium text-gray-700">Pending</span>
                   </div>
-                  <span className="text-xs text-gray-500 ml-4">{pendingTasks || 5} (8%)</span>
+                  <span className="text-xs text-gray-500 ml-4">
+                    {pendingTasks} ({totalTasks > 0 ? Math.round((pendingTasks/totalTasks)*100) : 0}%)
+                  </span>
                 </div>
               </div>
             </div>
@@ -271,7 +334,7 @@ export default function LeadDashboard() {
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-bold text-gray-900">Upcoming Meetings</h3>
-              <span className="text-xs text-blue-600 font-medium cursor-pointer hover:underline">See all</span>
+              <Link href="/dashboard/lead/meetings" className="text-xs text-blue-600 font-medium cursor-pointer hover:underline">See all</Link>
             </div>
             <div className="space-y-4">
               {meetings.length > 0 ? meetings.map(meeting => (
@@ -299,34 +362,30 @@ export default function LeadDashboard() {
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-bold text-gray-900">Top Team Members</h3>
-              <span className="text-xs text-blue-600 font-medium cursor-pointer hover:underline">See all</span>
+              <Link href="/dashboard/lead/team" className="text-xs text-blue-600 font-medium cursor-pointer hover:underline">See all</Link>
             </div>
             <div className="space-y-5">
-              {[
-                { name: 'Alex User', tasks: 24, pct: '+12%' },
-                { name: 'Sarah Smith', tasks: 18, pct: '+9%' },
-                { name: 'John Doe', tasks: 15, pct: '+7%' },
-                { name: 'Michael Brown', tasks: 12, pct: '+5%' },
-              ].map((user, i) => (
-                <div key={i} className="flex items-center justify-between">
+              {topTeamMembers.length > 0 ? topTeamMembers.map((user) => (
+                <div key={user.id} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
-                      {user.name.split(' ').map(n => n[0]).join('')}
+                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600 uppercase">
+                      {user.name.split(' ').map((n: string) => n[0]).join('')}
                     </div>
                     <span className="text-sm font-medium text-gray-900">{user.name}</span>
                   </div>
                   <div className="flex items-center gap-6">
                     <span className="text-xs text-gray-500">{user.tasks} Tasks</span>
-                    <span className="text-xs font-semibold text-green-500 w-8 text-right">{user.pct}</span>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <p className="text-sm text-gray-500 text-center py-4">No active team members.</p>
+              )}
             </div>
           </div>
 
           {/* Recent Activity */}
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-            <h3 className="font-bold text-gray-900 mb-6">Recent Activity (ActivityLog)</h3>
+            <h3 className="font-bold text-gray-900 mb-6">Recent Activity</h3>
             <div className="space-y-6 relative before:absolute before:inset-0 before:ml-2.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-200 before:to-transparent">
               {logs.length > 0 ? logs.map((log) => (
                 <div key={log.id} className="relative flex items-start gap-4">
