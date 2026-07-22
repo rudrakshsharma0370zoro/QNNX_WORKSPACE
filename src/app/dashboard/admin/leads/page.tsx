@@ -1,16 +1,20 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { Users, Plus, Search, Edit2, Trash2, Mail, X } from 'lucide-react';
+import { Search, Edit2, Trash2, Mail, X } from 'lucide-react';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 export default function AdminLeads() {
   const router = useRouter();
   const [leads, setLeads] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [editingLead, setEditingLead] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', department: '' });
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const unsubLeads = onSnapshot(query(collection(db, 'users'), where('role', '==', 'lead')), snapshot => {
@@ -22,6 +26,47 @@ export default function AdminLeads() {
     return () => { unsubLeads(); unsubProjects(); };
   }, []);
 
+  const handleDelete = async (id: string, name: string) => {
+    if (confirm(`Are you sure you want to remove the lead "${name}"?`)) {
+      try {
+        // Optimistic update
+        setLeads(prev => prev.filter(l => l.id !== id));
+        await fetchWithAuth(`/api/users/${id}`, { method: 'DELETE' });
+      } catch (e) {
+        console.error(e);
+        alert('Failed to delete lead.');
+      }
+    }
+  };
+
+  const handleEditClick = (lead: any) => {
+    setEditingLead(lead);
+    setEditForm({ name: lead.name || '', department: lead.department || '' });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingLead) return;
+    setIsSaving(true);
+    try {
+      await fetchWithAuth(`/api/users/${editingLead.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(editForm)
+      });
+      setEditingLead(null);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to update lead.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const filteredLeads = leads.filter(lead => 
+    lead.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    lead.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    lead.department?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="font-sans text-gray-800 bg-gray-50/30 p-6 lg:p-8 min-h-full w-full relative">
       <div className="max-w-[1400px] mx-auto space-y-6">
@@ -31,12 +76,6 @@ export default function AdminLeads() {
             <h2 className="text-2xl font-bold text-gray-900">Leads Management</h2>
             <p className="text-sm text-gray-500 mt-1">Manage team leads, assign projects, and monitor their departments.</p>
           </div>
-          <button 
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Add Lead
-          </button>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -46,6 +85,8 @@ export default function AdminLeads() {
               <input 
                 type="text" 
                 placeholder="Search leads..." 
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
               />
             </div>
@@ -62,7 +103,7 @@ export default function AdminLeads() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {leads.map((lead) => {
+                {filteredLeads.map((lead) => {
                   const leadProjects = projects.filter(p => p.leadId === lead.id);
                   
                   return (
@@ -86,7 +127,7 @@ export default function AdminLeads() {
                       </td>
                       <td className="px-6 py-4">
                         <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full border border-gray-200">
-                          {lead.department}
+                          {lead.department || 'Unassigned'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -104,8 +145,8 @@ export default function AdminLeads() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-3 text-gray-400" onClick={e => e.stopPropagation()}>
-                          <button className="p-1.5 hover:bg-indigo-50 hover:text-indigo-600 rounded transition-colors" title="Edit Lead"><Edit2 className="w-4 h-4" /></button>
-                          <button className="p-1.5 hover:bg-red-50 hover:text-red-600 rounded transition-colors" title="Remove Lead"><Trash2 className="w-4 h-4" /></button>
+                          <button onClick={() => handleEditClick(lead)} className="p-1.5 hover:bg-indigo-50 hover:text-indigo-600 rounded transition-colors" title="Edit Lead"><Edit2 className="w-4 h-4" /></button>
+                          <button onClick={() => handleDelete(lead.id, lead.name)} className="p-1.5 hover:bg-red-50 hover:text-red-600 rounded transition-colors" title="Remove Lead"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       </td>
                     </tr>
@@ -113,37 +154,58 @@ export default function AdminLeads() {
                 })}
               </tbody>
             </table>
+            {filteredLeads.length === 0 && (
+              <div className="p-8 text-center text-gray-500 text-sm">
+                No leads found.
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Add Lead Modal */}
-      {isAddModalOpen && (
+      {/* Edit Lead Modal */}
+      {editingLead && (
         <div className="fixed inset-0 bg-gray-900/40 z-[100] flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-[400px] border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-xl w-[450px] border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h3 className="text-sm font-bold text-gray-900">Add New Lead</h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+              <h3 className="text-sm font-bold text-gray-900">Edit Lead Profile</h3>
+              <button onClick={() => setEditingLead(null)} className="text-gray-400 hover:text-gray-600">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Full Name</label>
-                <input type="text" placeholder="e.g. Alex Rivera" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
+                <input type="text" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} placeholder="e.g. Alex Rivera" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Email</label>
-                <input type="email" placeholder="alex.rivera@qnnx.com" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Email (Read-Only)</label>
+                <input type="email" value={editingLead.email} disabled className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[13px] text-gray-500 cursor-not-allowed" />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Department</label>
-                <input type="text" placeholder="e.g. Engineering" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
+                <input type="text" value={editForm.department} onChange={e => setEditForm({...editForm, department: e.target.value})} placeholder="e.g. Engineering" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Managed Projects</label>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-[13px] text-gray-600 max-h-32 overflow-y-auto">
+                  {projects.filter(p => p.leadId === editingLead.id).length > 0 ? (
+                    <ul className="list-disc pl-4 space-y-1">
+                      {projects.filter(p => p.leadId === editingLead.id).map(p => (
+                        <li key={p.id}>{p.name}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span className="italic text-gray-400">No projects currently managed by this lead.</span>
+                  )}
+                </div>
               </div>
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
-              <button onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-              <button onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700">Add Lead</button>
+              <button onClick={() => setEditingLead(null)} className="px-4 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button onClick={handleSaveEdit} disabled={isSaving} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-all">
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
             </div>
           </div>
         </div>

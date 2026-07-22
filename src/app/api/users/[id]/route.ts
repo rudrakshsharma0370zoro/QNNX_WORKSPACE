@@ -104,6 +104,16 @@ async function updateProfile(
       updates.name = name;
     }
 
+    if (body.department !== undefined) {
+      if (typeof body.department !== 'string') {
+        return NextResponse.json(
+          { error: 'Bad Request', details: 'Field "department" must be a string.' },
+          { status: 400 }
+        );
+      }
+      updates.department = body.department.trim();
+    }
+
     if (body.avatarUrl !== undefined) {
       if (typeof body.avatarUrl !== 'string') {
         return NextResponse.json(
@@ -144,7 +154,7 @@ async function updateProfile(
 
     if (Object.keys(updates).length === 0 && privateDetails === null) {
       return NextResponse.json(
-        { error: 'Bad Request', details: 'No editable fields provided (name, avatarUrl, preferences, personalDetails).' },
+        { error: 'Bad Request', details: 'No editable fields provided (name, department, avatarUrl, preferences, personalDetails).' },
         { status: 400 }
       );
     }
