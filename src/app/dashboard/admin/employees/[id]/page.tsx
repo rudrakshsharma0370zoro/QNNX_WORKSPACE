@@ -2,7 +2,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebaseClient';
-import { collection, onSnapshot, query, where, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc, or } from 'firebase/firestore';
 import { ArrowLeft, Mail, Briefcase, CheckSquare, Clock } from 'lucide-react';
 
 export default function AdminEmployeeProfile() {
@@ -22,9 +22,18 @@ export default function AdminEmployeeProfile() {
       }
       setLoading(false);
     });
-    const unsubTasks = onSnapshot(query(collection(db, 'tasks'), where('assigneeId', '==', employeeId)), snapshot => {
-      setEmployeeTasks(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    const unsubTasks = onSnapshot(
+      query(
+        collection(db, 'tasks'), 
+        or(
+          where('assigneeId', '==', employeeId),
+          where('assignees', 'array-contains', employeeId)
+        )
+      ), 
+      snapshot => {
+        setEmployeeTasks(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
+    );
     return () => { unsubUser(); unsubTasks(); };
   }, [employeeId]);
 

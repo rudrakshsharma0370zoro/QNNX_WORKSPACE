@@ -78,7 +78,7 @@ service cloud.firestore {
     // Writes: none from the client — all task writes go through the API.
     match /tasks/{taskId} {
       allow read: if isAdmin() || isLead()
-                  || (isAuthenticated() && resource.data.get('assigneeId', '') == request.auth.uid);
+                  || (isAuthenticated() && resource.data.assigneeId == request.auth.uid);
       allow create, update, delete: if false;
     }
 
@@ -87,7 +87,7 @@ service cloud.firestore {
     //   where('participants','array-contains',uid)
     match /meetings/{meetingId} {
       allow read: if isAdmin() || isLead()
-                  || (isAuthenticated() && request.auth.uid in resource.data.get('participants', []));
+                  || (isAuthenticated() && request.auth.uid in resource.data.participants);
       allow create, update, delete: if false;
     }
 
