@@ -4,13 +4,14 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Bell, Settings, LogOut, Briefcase, X } from 'lucide-react';
+import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Bell, Settings, LogOut, Briefcase, Moon, X } from 'lucide-react';
 
 export default function LeadLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, role, loading, logout } = useAuth();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   
   useEffect(() => {
     if (!loading && (!user || role !== 'lead')) {
@@ -93,17 +94,43 @@ export default function LeadLayout({ children }: { children: React.ReactNode }) 
                 </div>
               )}
             </div>
-            <div 
-              onClick={() => router.push('/dashboard/lead/settings')} 
-              className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-            >
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{user?.displayName || user?.email || 'Lead User'}</p>
-                <p className="text-xs text-gray-500 capitalize">{role || 'Team Lead'}</p>
-              </div>
-              <div className="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-sm uppercase">
-                {user?.displayName ? user.displayName.charAt(0) : user?.email ? user.email.charAt(0) : 'L'}
-              </div>
+            <div className="relative">
+              <button 
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="flex items-center gap-3 hover:opacity-80 transition-opacity focus:outline-none"
+              >
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-medium text-gray-900">{user?.displayName || user?.email || 'Lead User'}</p>
+                  <p className="text-xs text-gray-500 capitalize">{role || 'Team Lead'}</p>
+                </div>
+                <div className="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-sm uppercase">
+                  {user?.displayName ? user.displayName.charAt(0) : user?.email ? user.email.charAt(0) : 'L'}
+                </div>
+              </button>
+              
+              {isUserMenuOpen && (
+                <div className="absolute right-0 mt-3 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
+                  <Link 
+                    href="/dashboard/lead/settings" 
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    <Settings className="w-4 h-4" /> Profile & Settings
+                  </Link>
+                  <button 
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    <Moon className="w-4 h-4" /> Theme Toggle
+                  </button>
+                  <div className="border-t border-gray-100 my-1"></div>
+                  <button 
+                    onClick={() => logout()} 
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                  >
+                    <LogOut className="w-4 h-4" /> Sign Out
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
