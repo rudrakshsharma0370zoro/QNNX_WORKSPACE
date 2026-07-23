@@ -4,7 +4,7 @@ import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { useAuth } from '@/components/AuthProvider';
-import { Briefcase, Users, X } from 'lucide-react';
+import { Briefcase, Users, X, Plus } from 'lucide-react';
 import MemberSelect from '@/components/MemberSelect';
 
 const STATUS_OPTIONS = ['Pending', 'In Progress', 'Completed'];
@@ -17,6 +17,26 @@ export default function LeadProjects() {
   const [statusValue, setStatusValue] = useState('In Progress');
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newProject, setNewProject] = useState<{ name: string; deadline: string; status: string; employeeIds: string[] }>({ name: '', deadline: '', status: 'In Progress', employeeIds: [] });
+  const [loading, setLoading] = useState(false);
+
+  const handleCreateProject = async () => {
+    if (!newProject.name) return;
+    setLoading(true);
+    try {
+      await fetchWithAuth('/api/projects', {
+        method: 'POST',
+        body: JSON.stringify({ ...newProject, leadId: user?.uid }),
+      });
+      setIsAddModalOpen(false);
+      setNewProject({ name: '', deadline: '', status: 'In Progress', employeeIds: [] });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, 'projects')), snapshot => {
@@ -59,9 +79,17 @@ export default function LeadProjects() {
     <div className="font-sans text-gray-800 bg-[#F8FAFC] p-6 lg:p-8 min-h-full w-full relative">
       <div className="max-w-[1400px] mx-auto space-y-6">
 
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900">My Projects</h2>
-          <p className="text-sm text-gray-500 mt-1">Projects you lead. Update their status and manage who&apos;s on the team.</p>
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">My Projects</h2>
+            <p className="text-sm text-gray-500 mt-1">Projects you lead. Update their status and manage who&apos;s on the team.</p>
+          </div>
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Create Project
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -143,6 +171,57 @@ export default function LeadProjects() {
               </button>
               <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 transition-colors">
                 Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Project Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 bg-gray-900/40 z-[100] flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-[450px] border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <Briefcase className="w-4 h-4 text-indigo-600" /> Create New Project
+              </h3>
+              <button onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Project Name</label>
+                <input type="text" value={newProject.name} onChange={e => setNewProject({...newProject, name: e.target.value})} placeholder="e.g. Website Redesign" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Deadline</label>
+                  <input type="date" value={newProject.deadline} onChange={e => setNewProject({...newProject, deadline: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Status</label>
+                  <select value={newProject.status} onChange={e => setNewProject({...newProject, status: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-700">
+                    <option value="In Progress">In Progress</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </div>
+              </div>
+              <MemberSelect
+                users={assignableUsers}
+                selected={newProject.employeeIds}
+                onChange={(ids) => setNewProject({ ...newProject, employeeIds: ids })}
+              />
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+              <button onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleCreateProject} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 transition-colors">
+                Create Project
               </button>
             </div>
           </div>
