@@ -18,8 +18,6 @@ export const runtime = 'edge';
 // content-type/size"). Both are enforced below.
 const ALLOWED_CONTENT_TYPES = new Set([
   'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-powerpoint',

@@ -292,6 +292,7 @@ export default function AdminDocuments() {
                 type="file" 
                 ref={fileInputRef} 
                 onChange={handleFileSelect} 
+                accept=".pdf,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.gif,.webp,.zip"
                 className="hidden" 
               />
               
