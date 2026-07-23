@@ -124,6 +124,27 @@ export default function MeetingsPage() {
     }
   };
 
+  const handleEmailInvites = (meeting: Meeting) => {
+    const emails = (meeting.participants || [])
+      .map(uid => allUsers.find(u => u.id === uid)?.email)
+      .filter(Boolean)
+      .join(',');
+      
+    if (!emails) {
+      alert('No valid emails found for the invited participants.');
+      return;
+    }
+    
+    // Copy emails to clipboard
+    navigator.clipboard.writeText(emails).catch(() => {});
+    
+    // Launch mail app with BCC
+    const subject = encodeURIComponent(`Meeting Invite: ${meeting.title}`);
+    const body = encodeURIComponent(`Join us on ${meeting.platform || 'video call'} at ${meeting.time || ''} on ${new Date(meeting.date).toLocaleDateString()}.\n\nLink: ${meeting.link || joinUrl(meeting)}\n\n`);
+    
+    window.location.href = `mailto:?bcc=${emails}&subject=${subject}&body=${body}`;
+  };
+
   const handleJoin = (meeting: Meeting) => {
     // window.open(meeting.link || 'https://meet.google.com/new', '_blank');
     // Jitsi fix: joinUrl() falls back to a room named after the meeting id,
@@ -261,12 +282,12 @@ export default function MeetingsPage() {
                     <Video className="w-4 h-4 text-blue-500" /> {meeting.platform || 'Video Call'}
                   </span>
                   <div className="flex gap-2">
-                    <a
-                      href={`mailto:?bcc=team@qnnx.com&subject=Meeting Invite: ${meeting.title}&body=Join us on ${meeting.platform || 'video call'} at ${meeting.time || ''} on ${meeting.date}. Link: ${meeting.link || ''}`}
+                    <button
+                      onClick={() => handleEmailInvites(meeting)}
                       className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors"
                     >
-                      Email Invites
-                    </a>
+                      Invite via Mail
+                    </button>
                     <button
                       onClick={() => handleJoin(meeting)}
                       className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors"

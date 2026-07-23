@@ -163,6 +163,27 @@ export default function AdminMeetings() {
     }
   };
 
+  const handleEmailInvites = (meeting: Meeting) => {
+    const emails = (meeting.participants || [])
+      .map(uid => allUsers.find(u => u.id === uid)?.email)
+      .filter(Boolean)
+      .join(',');
+      
+    if (!emails) {
+      alert('No valid emails found for the invited participants.');
+      return;
+    }
+    
+    // Copy emails to clipboard
+    navigator.clipboard.writeText(emails).catch(() => {});
+    
+    // Launch mail app with BCC
+    const subject = encodeURIComponent(`Meeting Invite: ${meeting.title}`);
+    const body = encodeURIComponent(`Join us on ${meeting.platform || 'video call'} at ${meeting.time || ''} on ${new Date(meeting.date).toLocaleDateString()}.\n\nLink: ${meeting.link || joinUrl(meeting)}\n\n`);
+    
+    window.location.href = `mailto:?bcc=${emails}&subject=${subject}&body=${body}`;
+  };
+
   const handleJoin = (meeting: Meeting) => {
     window.open(joinUrl(meeting), '_blank');
   };
@@ -236,22 +257,30 @@ export default function AdminMeetings() {
                     <div className="flex items-center gap-2 text-[13px] font-medium text-gray-600">
                       <Video className="w-4 h-4 text-blue-500" /> {meeting.platform || 'Video Call'}
                     </div>
-                    {(user as any)?.role === 'admin' || user?.uid === meeting.createdBy || (meeting.participants && meeting.participants.includes(user?.uid || '')) ? (
+                    <div className="flex gap-2">
                       <button
-                        onClick={() => handleJoin(meeting)}
-                        className="px-4 py-1.5 bg-[#4F46E5] text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
+                        onClick={() => handleEmailInvites(meeting)}
+                        className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium transition-colors"
                       >
-                        Join
+                        Invite via Mail
                       </button>
-                    ) : (
-                      <button
-                        disabled
-                        className="px-4 py-1.5 bg-gray-100 text-gray-400 rounded-md text-sm font-medium cursor-not-allowed border border-gray-200"
-                        title="You are not authorized to join this meeting"
-                      >
-                        Not Invited
-                      </button>
-                    )}
+                      {(user as any)?.role === 'admin' || user?.uid === meeting.createdBy || (meeting.participants && meeting.participants.includes(user?.uid || '')) ? (
+                        <button
+                          onClick={() => handleJoin(meeting)}
+                          className="px-4 py-1.5 bg-[#4F46E5] text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
+                        >
+                          Join
+                        </button>
+                      ) : (
+                        <button
+                          disabled
+                          className="px-4 py-1.5 bg-gray-100 text-gray-400 rounded-md text-sm font-medium cursor-not-allowed border border-gray-200"
+                          title="You are not authorized to join this meeting"
+                        >
+                          Not Invited
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
