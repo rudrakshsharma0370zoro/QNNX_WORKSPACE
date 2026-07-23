@@ -140,6 +140,9 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
                   <div className="absolute right-0 mt-3 w-72 bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
                     <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center">
                       <span className="text-sm font-bold text-gray-900">Upcoming Meetings</span>
+                      <button onClick={() => setIsNotifOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors" title="Close notifications">
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
                     <div className="max-h-64 overflow-y-auto">
                       {upcomingMeetings.length === 0 ? (
