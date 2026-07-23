@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Bell, Settings, LogOut, Briefcase } from 'lucide-react';
+import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Bell, Settings, LogOut, Briefcase, X } from 'lucide-react';
 
 export default function LeadLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -83,6 +83,9 @@ export default function LeadLayout({ children }: { children: React.ReactNode }) 
                 <div className="absolute right-0 mt-3 w-72 bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
                   <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center">
                     <span className="text-sm font-bold text-gray-900">Notifications</span>
+                    <button onClick={() => setIsNotifOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors" title="Close notifications">
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                   <div className="max-h-64 overflow-y-auto">
                     <p className="px-4 py-6 text-[12px] text-gray-500 text-center">No new notifications.</p>

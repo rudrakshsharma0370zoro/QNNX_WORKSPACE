@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
@@ -104,14 +105,8 @@ export default function Home() {
 
       <div className="w-full max-w-md z-10">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-50 border border-indigo-100 rounded-xl text-indigo-600 shadow-sm">
-              <FileText className="w-6 h-6" />
-            </div>
-            <div className="text-left">
-              <h1 className="text-2xl font-bold text-slate-900 leading-none tracking-tight">QNNX</h1>
-              <span className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">Workspace</span>
-            </div>
+          <div className="inline-flex items-center justify-center">
+            <Image src="/qnnx-logo.png" alt="QNNX Logo" width={180} height={50} className="w-auto h-12 object-contain" priority />
           </div>
           <p className="mt-3 text-sm text-slate-500">Secure Internal Workspace Management Gateway</p>
         </div>
