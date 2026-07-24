@@ -22,7 +22,14 @@ export function newJitsiLink(): string {
  * room (never a per-click new one).
  */
 export function joinUrl(meeting: { id: string; link?: string | null }): string {
-  return meeting.link || `https://meet.jit.si/QNNX-${meeting.id}`;
+  if (meeting.link) {
+    let url = meeting.link;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+    return url;
+  }
+  return `https://meet.jit.si/QNNX-${meeting.id}`;
 }
 
 /**

@@ -34,11 +34,7 @@ export default function UserMeetings() {
   }, [user?.uid]);
 
   const handleJoin = (meeting: any) => {
-    if (meeting.link) {
-      window.open(meeting.link, '_blank');
-    } else {
-      alert("No valid Google Meet link was provided for this meeting.");
-    }
+    window.open(joinUrl(meeting), '_blank');
   };
 
   return (
