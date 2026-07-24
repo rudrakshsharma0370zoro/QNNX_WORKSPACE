@@ -4,8 +4,9 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import NotificationBell from '@/components/NotificationBell';
-import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Settings, LogOut, Briefcase, Moon } from 'lucide-react';
+import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Bell, Settings, LogOut, Briefcase, Moon, X, Search, Clock } from 'lucide-react';
+import { db } from '@/lib/firebaseClient';
+import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 
 export default function LeadLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -13,12 +14,31 @@ export default function LeadLayout({ children }: { children: React.ReactNode }) 
   const { user, role, profile, loading, logout } = useAuth();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   
   useEffect(() => {
     if (!loading && (!user || role !== 'lead')) {
       router.push('/');
     }
   }, [user, role, loading, router]);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'activityLog'), orderBy('createdAt', 'desc'), limit(10));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setNotifications(notifs);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/dashboard/lead/search?q=${encodeURIComponent(searchQuery)}`);
+    }
+  };
 
   if (loading || !user || role !== 'lead') {
     return (
@@ -73,10 +93,61 @@ export default function LeadLayout({ children }: { children: React.ReactNode }) 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Header */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-end px-8">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8">
+          {/* Search Bar */}
+          <form onSubmit={handleSearch} className="relative w-80">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input 
+              type="text" 
+              placeholder="Search across workspace..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-gray-50/50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+            />
+          </form>
+
           <div className="flex items-center gap-6">
             {/* Notifications Dropdown */}
-            <NotificationBell />
+            <div className="relative">
+              <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="relative text-gray-500 hover:text-gray-700">
+                <Bell className="w-5 h-5" />
+                {notifications.length > 0 && (
+                  <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                )}
+              </button>
+              {isNotifOpen && (
+                <div className="absolute right-0 mt-3 w-80 bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
+                  <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center">
+                    <span className="text-sm font-bold text-gray-900">Notifications</span>
+                    <button onClick={() => setIsNotifOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors" title="Close notifications">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <p className="px-4 py-6 text-[12px] text-gray-500 text-center">No new notifications.</p>
+                    ) : (
+                      <div className="divide-y divide-gray-50">
+                        {notifications.map(notif => (
+                          <div key={notif.id} className="p-3 hover:bg-gray-50 flex items-start gap-3 transition-colors">
+                            <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
+                              {notif.type === 'meeting_scheduled' ? <Calendar className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-900 font-medium truncate">{notif.message}</p>
+                              <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mt-1">
+                                <Clock className="w-3 h-3" />
+                                {new Date(notif.createdAt).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="relative">
               <button 
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}

@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Bell, Shield, Save, Loader2, CheckCircle2, Palette, Sun, Moon, Laptop } from 'lucide-react';
+import { User, Bell, Shield, Save, Loader2, CheckCircle2, Palette, Sun, Moon, Laptop, Trash2, AlertTriangle } from 'lucide-react';
 import { auth } from '@/config/firebaseConfig';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { useTheme } from 'next-themes';
@@ -219,6 +219,33 @@ export default function LeadSettings() {
       setSecurityError(err.message || 'Failed to send reset link');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (confirm('Are you sure you want to permanently delete your account? This action cannot be undone.')) {
+      if (confirm('Final warning: All your data will be permanently erased.')) {
+        try {
+          setSaving(true);
+          const token = await auth.currentUser?.getIdToken();
+          const res = await fetch(`/api/users/${uid}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (!res.ok) throw new Error('Failed to delete account');
+          
+          const user = auth.currentUser;
+          if (user) await user.delete();
+        } catch (err: any) {
+          if (err.code === 'auth/requires-recent-login') {
+            alert('Security requires a recent login to delete your account. Please log out and log back in, then try again.');
+          } else {
+            alert(err.message || 'Failed to delete account');
+          }
+        } finally {
+          setSaving(false);
+        }
+      }
     }
   };
 
@@ -611,6 +638,25 @@ export default function LeadSettings() {
                       Update Password
                     </button>
                   </div>
+                </div>
+
+                {/* Danger Zone */}
+                <div className="max-w-md pt-8 mt-8 border-t border-gray-100">
+                  <h4 className="text-[14px] font-semibold text-red-600 flex items-center gap-2 mb-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Danger Zone
+                  </h4>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Permanently delete your account and all associated data. This action cannot be undone.
+                  </p>
+                  <button 
+                    onClick={handleDeleteAccount}
+                    disabled={saving}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 hover:text-red-700 transition-colors disabled:opacity-50 border border-red-100"
+                  >
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    Delete Account
+                  </button>
                 </div>
 
               </div>

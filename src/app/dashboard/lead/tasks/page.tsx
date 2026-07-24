@@ -108,7 +108,7 @@ export default function LeadTasks() {
       title: task.title || '',
       projectId: task.projectId || '',
       priority: task.priority ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1) : 'Medium',
-      assigneeId: task.assigneeId || '',
+      assigneeId: (task.assignees && task.assignees[0]) || task.assigneeId || '',
     });
   };
 
