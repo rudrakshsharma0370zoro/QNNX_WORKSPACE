@@ -3,6 +3,7 @@ export const runtime = 'edge';
 import { requireRole } from '@/lib/auth';
 import { firestoreAdminCreate, firestoreAdminUpdate } from '@/lib/firestoreAdmin';
 import { logActivityServer } from '@/lib/activityLog';
+import { sendNotification } from '@/lib/notifications';
 
 // NOTE: A Google Calendar integration using the Node-only `googleapis` package
 // used to live here. It was removed because `googleapis` is not Edge-compatible
@@ -77,6 +78,22 @@ export const POST = requireRole(['lead', 'admin'], async (req) => {
       actorName,
       meetingId,
     });
+
+    // Notify participants. Also notify the creator so they see the bell icon update during testing.
+    const notifyUsers = new Set<string>();
+    notifyUsers.add(req.user.uid); // Always notify creator
+    if (Array.isArray(participants)) {
+      participants.forEach(p => notifyUsers.add(p));
+    }
+
+    if (notifyUsers.size > 0) {
+      await sendNotification(Array.from(notifyUsers), {
+        title: 'New Meeting Scheduled',
+        message: `${actorName} scheduled "${title.trim()}" on ${date}.`,
+        type: 'meeting_scheduled',
+        link: `/dashboard/${req.user.role}/meetings`, 
+      });
+    }
 
     return NextResponse.json(
       { success: true, meetingId, link: finalLink, message: 'Meeting created successfully.' },
@@ -171,6 +188,19 @@ export const PATCH = requireRole(['lead', 'admin'], async (req) => {
 
     updates.updatedAt = new Date();
     await firestoreAdminUpdate('meetings', meetingId, updates);
+
+    // If participants were updated or date/time was changed, notify
+    if (body.participants && Array.isArray(body.participants)) {
+      const notifyUsers = body.participants.filter((p: unknown) => typeof p === 'string' && p !== req.user.uid);
+      if (notifyUsers.length > 0) {
+        await sendNotification(notifyUsers, {
+          title: 'Meeting Updated',
+          message: `The meeting "${body.title || 'you are invited to'}" was updated.`,
+          type: 'meeting_scheduled',
+          link: `/dashboard/${req.user.role}/meetings`,
+        });
+      }
+    }
 
     return NextResponse.json(
       { success: true, meetingId, updated: Object.keys(updates), message: 'Meeting updated successfully.' },

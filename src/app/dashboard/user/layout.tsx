@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthProvider';
+import NotificationBell from '@/components/NotificationBell';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { isUpcoming } from '@/utils/meeting';
@@ -131,41 +132,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
             <div className="flex items-center gap-4 border-r border-gray-200 pr-6 relative">
               
               {/* Notifications Dropdown */}
-              <div className="relative">
-                <button onClick={() => {setIsNotifOpen(!isNotifOpen);}} className="relative text-gray-400 hover:text-gray-600 transition-colors" title="Notifications">
-                  <Bell className="w-5 h-5" />
-                  <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-                </button>
-                {isNotifOpen && (
-                  <div className="absolute right-0 mt-3 w-72 bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
-                    <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center">
-                      <span className="text-sm font-bold text-gray-900">Upcoming Meetings</span>
-                      <button onClick={() => setIsNotifOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors" title="Close notifications">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="max-h-64 overflow-y-auto">
-                      {upcomingMeetings.length === 0 ? (
-                        <p className="px-4 py-6 text-[12px] text-gray-500 text-center">No notifications yet.</p>
-                      ) : (
-                        upcomingMeetings.map((m) => (
-                          <Link
-                            key={m.id}
-                            href="/dashboard/user/meetings"
-                            onClick={() => setIsNotifOpen(false)}
-                            className="block px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 cursor-pointer"
-                          >
-                            <p className="text-[12px] font-semibold text-gray-900">{m.title}</p>
-                            <p className="text-[11px] text-gray-500 mt-0.5">
-                              {new Date(m.date).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          </Link>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <NotificationBell />
             </div>
             
             {/* Profile Block */}

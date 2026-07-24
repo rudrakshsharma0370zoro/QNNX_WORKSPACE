@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Users, Video, Plus, MoreVertical, Zap } from 'lucide-react';
+import { Calendar, Clock, Users, Video, Plus, MoreVertical, Zap, Trash2 } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
@@ -16,6 +16,7 @@ interface Meeting {
   link?: string | null;
   participants?: string[];
   type?: 'scheduled' | 'instant';
+  isHidden?: boolean;
 }
 
 interface AppUser {
@@ -39,15 +40,18 @@ export default function MeetingsPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!user) return; // Wait for auth to resolve before fetching
+
     const q = query(collection(db, 'meetings'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setMeetings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Meeting[]);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Meeting[];
+      setMeetings(data.filter(m => !m.isHidden));
     });
     const unsubUsers = onSnapshot(query(collection(db, 'users')), (snapshot) => {
       setAllUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as AppUser[]);
     });
     return () => { unsubscribe(); unsubUsers(); };
-  }, []);
+  }, [user]);
 
   const toggleParticipant = (uid: string) => {
     setSelectedParticipants(prev =>
@@ -155,6 +159,21 @@ export default function MeetingsPage() {
   const upcomingMeetings = meetings.filter(m => isUpcoming(m.date));
   const pastMeetings = meetings.filter(m => !isUpcoming(m.date));
 
+  const handleRemoveMeeting = async (meeting: Meeting) => {
+    if (!window.confirm('Are you sure you want to remove this meeting?')) return;
+    try {
+      const res = await fetchWithAuth(`/api/meetings/${meeting.id}/remove`, {
+        method: 'PATCH',
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.details || body.error || 'Failed to remove meeting.');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Failed to remove meeting.');
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       {/* Header Section */}
@@ -258,9 +277,19 @@ export default function MeetingsPage() {
                       {meeting.type === 'instant' ? 'Instant' : 'Scheduled'}
                     </span>
                   </div>
-                  <button className="text-gray-400 hover:text-gray-600">
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
+                  {meeting.createdBy === user?.uid ? (
+                    <button 
+                      onClick={() => handleRemoveMeeting(meeting)}
+                      className="text-gray-400 hover:text-red-600 transition-colors"
+                      title="Remove meeting"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button className="text-gray-400 hover:text-gray-600">
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
 
                 <div className="space-y-2 mt-auto mb-6">
@@ -315,9 +344,19 @@ export default function MeetingsPage() {
               <div key={meeting.id} className="bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full opacity-80">
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="font-semibold text-gray-700">{meeting.title}</h3>
-                  <button className="text-gray-400 hover:text-gray-600">
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
+                  {meeting.createdBy === user?.uid ? (
+                    <button 
+                      onClick={() => handleRemoveMeeting(meeting)}
+                      className="text-gray-400 hover:text-red-600 transition-colors"
+                      title="Remove meeting"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button className="text-gray-400 hover:text-gray-600">
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
 
                 <div className="space-y-2 mt-auto">

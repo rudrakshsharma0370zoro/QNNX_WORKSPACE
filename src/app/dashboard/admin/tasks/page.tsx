@@ -53,7 +53,13 @@ export default function AdminTasks() {
     }
   };
 
-  const cycleStatus = async (id: string, currentStatus: string) => {
+  const cycleStatus = async (task: any) => {
+    const isUnassigned = !task.assigneeId && (!Array.isArray(task.assignees) || task.assignees.length === 0);
+    if (isUnassigned) {
+      alert("An Unassigned task cannot be marked as In Progress or Completed. Please assign it to a user first.");
+      return;
+    }
+    const currentStatus = task.status;
     const statusMap: Record<string, string> = {
       'pending': 'in-progress',
       'in-progress': 'completed',
@@ -64,10 +70,14 @@ export default function AdminTasks() {
     };
     const nextStatus = statusMap[currentStatus] || 'pending';
     try {
-      await fetchWithAuth(`/api/tasks/${id}`, {
+      const res = await fetchWithAuth(`/api/tasks/${task.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: nextStatus }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.details || 'Failed to update status');
+      }
     } catch(e) { console.error(e); }
   };
 
@@ -189,9 +199,25 @@ export default function AdminTasks() {
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
+            {tasks.length === 0 ? (
+              <tbody>
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-gray-500">
+                    <div className="flex flex-col items-center justify-center">
+                      <svg className="w-12 h-12 text-gray-300 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                      <p className="text-sm font-medium">No tasks found</p>
+                      <p className="text-xs text-gray-400 mt-1">Create your first task to get started.</p>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            ) : (
             <tbody className="divide-y divide-gray-100">
               {tasks.map((task) => {
-                const assignee = users.find(e => e.id === task.assigneeId);
+                const taskAssignees = Array.isArray(task.assignees) 
+                  ? task.assignees.map((id: string) => users.find(u => u.id === id)).filter(Boolean)
+                  : (task.assigneeId ? [users.find(u => u.id === task.assigneeId)].filter(Boolean) : []);
+                const primaryAssignee = taskAssignees[0];
 
                 return (
                   <tr key={task.id} className="hover:bg-gray-50/50 transition-colors group">
@@ -201,13 +227,23 @@ export default function AdminTasks() {
                         Details and subtasks for {task.title.toLowerCase()}...
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      {assignee ? (
+                    <td className="px-6 py-4 text-center relative group/assignee">
+                      {primaryAssignee ? (
                         <div className="flex items-center justify-center gap-2">
                           <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600">
-                            {assignee?.name ? assignee.name.charAt(0).toUpperCase() : '?'}
+                            {primaryAssignee?.name ? primaryAssignee.name.charAt(0).toUpperCase() : '?'}
                           </div>
-                          <span className="text-[13px] text-gray-600 font-medium">{assignee.name || assignee.email}</span>
+                          <span className="text-[13px] text-gray-600 font-medium">{primaryAssignee.name || primaryAssignee.email}</span>
+                          {taskAssignees.length > 1 && (
+                            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold cursor-help">
+                              +{taskAssignees.length - 1}
+                            </span>
+                          )}
+                          {taskAssignees.length > 1 && (
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 hidden group-hover/assignee:block z-50 bg-gray-900 text-white text-[11px] py-1 px-2 rounded whitespace-nowrap shadow-lg">
+                              {taskAssignees.slice(1).map((a: any) => a.name || a.email).join(', ')}
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <span className="text-[13px] text-gray-400 italic">Unassigned</span>
@@ -219,23 +255,17 @@ export default function AdminTasks() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {user?.uid === task.assigneeId ? (
                         <button 
-                          onClick={() => cycleStatus(task.id, task.status)}
+                          onClick={() => cycleStatus(task)}
                           title="Click to cycle status"
                           className={`flex items-center justify-between w-[110px] mx-auto px-3 py-1.5 rounded-md border text-[11px] font-bold ${getStatusColor(task.status || 'pending')} hover:opacity-80 transition-opacity`}
                         >
                           {(task.status || 'pending').toUpperCase()}
                           <svg className="w-3 h-3 ml-2 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
                         </button>
-                      ) : (
-                        <span className={`inline-block w-[110px] text-center px-3 py-1.5 rounded-md border text-[11px] font-bold ${getStatusColor(task.status || 'pending')}`}>
-                          {(task.status || 'pending').toUpperCase()}
-                        </span>
-                      )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex justify-end gap-3 transition-opacity">
                         <button onClick={() => openEditModal(task)} className="p-1.5 bg-gray-50 hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 rounded transition-colors" title="Edit Task"><Edit2 className="w-3.5 h-3.5" /></button>
                         <button onClick={() => handleDelete(task.id)} className="p-1.5 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
@@ -244,6 +274,7 @@ export default function AdminTasks() {
                 );
               })}
             </tbody>
+            )}
           </table>
         </div>
       </div>

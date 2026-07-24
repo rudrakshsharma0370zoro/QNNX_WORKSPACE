@@ -55,6 +55,15 @@ service cloud.firestore {
         allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
         allow write: if false;
       }
+
+      // --- Notifications ---------------------------------------------------
+      // Users can read and update (to mark as read) their own notifications.
+      // Notifications are created server-side by the API.
+      match /notifications/{notificationId} {
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+        allow update: if isAuthenticated() && request.auth.uid == userId;
+        allow create, delete: if false;
+      }
     }
 
     // --- Teams -----------------------------------------------------------

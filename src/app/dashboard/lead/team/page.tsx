@@ -3,12 +3,15 @@ import React, { useState, useEffect } from 'react';
 import { Mail, Briefcase, CheckCircle2 } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function TeamPage() {
+  const { user } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
 
   useEffect(() => {
+    if (!user) return; // Wait for auth to resolve before fetching
     // Fetch all team members (users with role 'user')
     const unsubUsers = onSnapshot(query(collection(db, 'users'), where('role', '==', 'user')), snapshot => {
       setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -18,20 +21,27 @@ export default function TeamPage() {
       setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => { unsubUsers(); unsubTasks(); };
-  }, []);
+  }, [user]);
 
   // Compute active tasks (Pending or In Progress) per user
   const userTaskCounts: Record<string, number> = {};
+  const userWeightedScores: Record<string, number> = {};
+  
   tasks.forEach(t => {
-    if (t.assigneeId && t.status !== 'Completed') {
-      userTaskCounts[t.assigneeId] = (userTaskCounts[t.assigneeId] || 0) + 1;
+    if (t.status !== 'Completed') {
+      const assignees = Array.isArray(t.assignees) ? t.assignees : (t.assigneeId ? [t.assigneeId] : []);
+      assignees.forEach(uid => {
+        userTaskCounts[uid] = (userTaskCounts[uid] || 0) + 1;
+        userWeightedScores[uid] = (userWeightedScores[uid] || 0) + (1 / assignees.length);
+      });
     }
   });
 
   const teamMembers = users.map(user => {
     const activeTasks = userTaskCounts[user.id] || 0;
-    // Assuming 10 active tasks is 100% workload capacity
-    const workload = Math.min(100, Math.round((activeTasks / 10) * 100));
+    const weightedScore = userWeightedScores[user.id] || 0;
+    // Assuming 10 full active tasks is 100% workload capacity
+    const workload = Math.min(100, Math.round((weightedScore / 10) * 100));
     
     // Assign a consistent color class based on the first letter of their name
     const charCode = user.name ? user.name.charCodeAt(0) : 0;

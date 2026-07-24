@@ -160,9 +160,9 @@ export const PATCH = requireRole(['user', 'lead', 'admin'], async (req, context)
       }
       if (body.dueDate !== undefined) set.dueDate = body.dueDate ? String(body.dueDate) : null;
       if (body.assignees !== undefined) {
-        if (!Array.isArray(body.assignees) || body.assignees.length === 0) {
+        if (!Array.isArray(body.assignees)) {
           return NextResponse.json(
-            { error: 'Bad Request', details: '"assignees" must be a non-empty array.' },
+            { error: 'Bad Request', details: '"assignees" must be an array.' },
             { status: 400 }
           );
         }
@@ -172,6 +172,16 @@ export const PATCH = requireRole(['user', 'lead', 'admin'], async (req, context)
         set.attachments = Array.isArray(body.attachments) ? body.attachments.map(a => String(a).trim()) : [];
       }
       if (body.projectId !== undefined) set.projectId = body.projectId ? String(body.projectId).trim() : null;
+    }
+    
+    // VALIDATION: Prevent unassigned tasks from being 'In Progress' or 'Completed'
+    const finalAssignees = set.assignees !== undefined ? set.assignees : (task.assignees || []);
+    const finalStatus = set.status !== undefined ? set.status : task.status;
+    if ((finalStatus === 'In Progress' || finalStatus === 'Completed') && (!Array.isArray(finalAssignees) || finalAssignees.length === 0)) {
+       return NextResponse.json(
+         { error: 'Bad Request', details: 'An Unassigned task cannot be marked as In Progress or Completed. Please assign it to a user first.' },
+         { status: 400 }
+       );
     }
 
     // Require at least one real change (updatedAt alone is not enough).

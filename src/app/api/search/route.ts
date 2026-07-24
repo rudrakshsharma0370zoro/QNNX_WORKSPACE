@@ -10,15 +10,16 @@ export const GET = requireRole(['admin', 'lead', 'user'], async (req) => {
     const query = (url.searchParams.get('q') || '').toLowerCase();
 
     if (!query) {
-      return NextResponse.json({ success: true, results: { users: [], projects: [], tasks: [] } });
+      return NextResponse.json({ success: true, results: [] });
     }
 
     // In a real large-scale application, you would use Algolia or Typesense for full-text search.
     // For now, we perform basic string matching across collections.
-    const [users, projects, tasks] = await Promise.all([
+    const [users, projects, tasks, documents] = await Promise.all([
       firestoreAdminList('users'),
       firestoreAdminList('projects'),
-      firestoreAdminList('tasks')
+      firestoreAdminList('tasks'),
+      firestoreAdminList('documents')
     ]);
 
     // This route reads via the service account, bypassing firestore.rules, so
@@ -60,13 +61,38 @@ export const GET = requireRole(['admin', 'lead', 'user'], async (req) => {
       (t.description && t.description.toLowerCase().includes(query))
     );
 
+    const matchedDocuments = documents.filter((d: any) =>
+      (d.title && d.title.toLowerCase().includes(query)) ||
+      (d.name && d.name.toLowerCase().includes(query)) ||
+      (d.filename && d.filename.toLowerCase().includes(query))
+    );
+
+    // Map matched items into a unified result set
+    const unifiedResults: any[] = [];
+    
+    matchedUsers.forEach((u: any) => {
+      unifiedResults.push({
+        id: u.id,
+        title: u.name || 'Unknown User',
+        type: 'employee',
+        url: `/dashboard/admin/employees/${u.id}`,
+        subtitle: u.email || 'No email'
+      });
+    });
+
+    matchedDocuments.forEach((d: any) => {
+      unifiedResults.push({
+        id: d.id,
+        title: d.title || d.name || d.filename || 'Untitled Document',
+        type: 'document',
+        url: '/dashboard/admin/documents', // We route them to the documents overview
+        subtitle: d.category || 'Document'
+      });
+    });
+
     return NextResponse.json({
       success: true,
-      results: {
-        users: matchedUsers,
-        projects: matchedProjects,
-        tasks: matchedTasks
-      }
+      results: unifiedResults
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

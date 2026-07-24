@@ -1,4 +1,5 @@
-import { firestoreAdminCreate } from './firestoreAdmin';
+import { firestoreAdminCreate, firestoreAdminList } from './firestoreAdmin';
+import { sendNotification } from './notifications';
 
 /**
  * Server-side team activity logger.
@@ -29,10 +30,25 @@ export interface ActivityInput {
 
 export async function logActivityServer(input: ActivityInput): Promise<void> {
   try {
+    const timestamp = new Date().toISOString();
     await firestoreAdminCreate('activityLog', {
       ...input,
-      createdAt: new Date().toISOString(),
+      createdAt: timestamp,
     });
+
+    // Automatically dispatch a system notification to all admins for audit tracking
+    const allUsers = await firestoreAdminList('users');
+    const adminIds = allUsers.filter(u => u.role === 'admin').map(u => u.id);
+    
+    if (adminIds.length > 0) {
+      await sendNotification(adminIds, {
+        title: 'System Activity',
+        message: input.message,
+        type: input.type,
+        link: '/dashboard/admin', // Default link for admin audit activities
+      });
+    }
+
   } catch (error) {
     console.warn('[activity] log write failed (non-critical):', error);
   }

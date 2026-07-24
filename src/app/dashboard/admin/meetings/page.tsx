@@ -5,7 +5,7 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { newJitsiLink, joinUrl, isUpcoming } from '@/utils/meeting';
 import { useAuth } from '@/components/AuthProvider';
-import { X, Plus, Video, Users, Calendar, Clock, Zap } from 'lucide-react';
+import { X, Plus, Video, Users, Calendar, Clock, Zap, Trash2 } from 'lucide-react';
 
 interface Meeting {
   id: string;
@@ -18,6 +18,7 @@ interface Meeting {
   type?: 'scheduled' | 'instant';
   createdAt?: string;
   createdBy?: string;
+  isHidden?: boolean;
 }
 
 interface AppUser {
@@ -45,12 +46,15 @@ export default function AdminMeetings() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!user) return; // Wait for auth to resolve before fetching
+
     // Real meetings data — previously this page subscribed to Firestore but
     // never rendered the result, showing three hardcoded example cards instead.
     const unsubMeetings = onSnapshot(
       query(collection(db, 'meetings'), orderBy('createdAt', 'desc')),
       (snapshot) => {
-        setMeetings(snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Meeting[]);
+        const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Meeting[];
+        setMeetings(data.filter(m => !m.isHidden));
       }
     );
     // Used to build the "invite participants" picker in the schedule modal.
@@ -61,7 +65,7 @@ export default function AdminMeetings() {
       setTeams(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => { unsubMeetings(); unsubUsers(); unsubTeams(); };
-  }, []);
+  }, [user]);
 
   const toggleParticipant = (uid: string) => {
     setSelectedParticipants(prev =>
@@ -191,6 +195,21 @@ export default function AdminMeetings() {
   const upcoming = meetings.filter(m => isUpcoming(m.date));
   const past = meetings.filter(m => !isUpcoming(m.date));
 
+  const handleRemoveMeeting = async (meeting: Meeting) => {
+    if (!window.confirm('Are you sure you want to remove this meeting?')) return;
+    try {
+      const res = await fetchWithAuth(`/api/meetings/${meeting.id}/remove`, {
+        method: 'PATCH',
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.details || body.error || 'Failed to remove meeting.');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Failed to remove meeting.');
+    }
+  };
+
   return (
     <div className="font-sans text-gray-800 bg-[#F8FAFC] p-6 lg:p-8 min-h-full w-full relative">
       <div className="max-w-[1200px] mx-auto space-y-8">
@@ -238,6 +257,13 @@ export default function AdminMeetings() {
                   <div>
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="font-bold text-gray-900">{meeting.title}</h4>
+                      <button 
+                        onClick={() => handleRemoveMeeting(meeting)}
+                        className="text-gray-400 hover:text-red-600 transition-colors"
+                        title="Remove meeting"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                     <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${
                       meeting.type === 'instant'
@@ -297,8 +323,17 @@ export default function AdminMeetings() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {past.map((meeting) => (
-                <div key={meeting.id} className="bg-gray-50 p-5 rounded-xl border border-gray-200 opacity-80">
-                  <h4 className="font-semibold text-gray-700">{meeting.title}</h4>
+                <div key={meeting.id} className="bg-gray-50 p-5 rounded-xl border border-gray-200 opacity-80 relative">
+                  <div className="flex justify-between items-start">
+                    <h4 className="font-semibold text-gray-700">{meeting.title}</h4>
+                    <button 
+                      onClick={() => handleRemoveMeeting(meeting)}
+                      className="text-gray-400 hover:text-red-600 transition-colors"
+                      title="Remove meeting"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                   <div className="mt-2 text-[13px] text-gray-500 flex items-center gap-2">
                     <Calendar className="w-4 h-4" /> {new Date(meeting.date).toLocaleDateString()}
                   </div>

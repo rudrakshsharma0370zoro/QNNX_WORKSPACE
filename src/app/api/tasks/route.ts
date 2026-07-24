@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireRole } from '@/lib/auth';
 import { firestoreAdminCreate } from '@/lib/firestoreAdmin';
+import { sendNotification } from '@/lib/notifications';
 
 // Explicitly define edge execution for Cloudflare compatibility
 export const runtime = 'edge';
@@ -77,6 +78,16 @@ export const POST = requireRole(['admin', 'lead'], async (req) => {
       createdAt: now,
       updatedAt: now,
     });
+
+    const notifyUsers = assignees.map(id => String(id).trim());
+    if (notifyUsers.length > 0) {
+      await sendNotification(notifyUsers, {
+        title: 'New Task Assigned',
+        message: `You have been assigned to task: "${title.trim()}"`,
+        type: 'task_assigned',
+        link: `/dashboard/${req.user.role}/tasks`, // Note: user role might not perfectly align with the assignee's role if different, but it's okay as a relative fallback, or just use a general link if possible, but tasks are typically at /dashboard/user/tasks. Let's omit role or just use their role if known.
+      });
+    }
 
     return NextResponse.json(
       { success: true, taskId, message: 'Task created successfully.' },

@@ -12,7 +12,7 @@ export default function UserTasks() {
 
   useEffect(() => {
     if (!user?.uid) return;
-    const unsubTasks = onSnapshot(query(collection(db, 'tasks'), where('assigneeId', '==', user.uid)), snapshot => {
+    const unsubTasks = onSnapshot(query(collection(db, 'tasks'), where('assignees', 'array-contains', user.uid)), snapshot => {
       setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     const unsubProjects = onSnapshot(query(collection(db, 'projects')), snapshot => {
@@ -104,8 +104,12 @@ export default function UserTasks() {
               
               {tasks.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-gray-500 font-medium">
-                    You have no assigned tasks.
+                  <td colSpan={4} className="py-12 text-center text-gray-500">
+                    <div className="flex flex-col items-center justify-center">
+                      <svg className="w-12 h-12 text-gray-300 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                      <p className="text-sm font-medium">No assigned tasks</p>
+                      <p className="text-xs text-gray-400 mt-1">You're all caught up! Enjoy your day.</p>
+                    </div>
                   </td>
                 </tr>
               )}

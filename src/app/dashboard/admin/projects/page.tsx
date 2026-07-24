@@ -114,10 +114,7 @@ export default function AdminProjects() {
             <h2 className="text-2xl font-bold text-gray-900">Projects Overview</h2>
             <p className="text-sm text-gray-500 mt-1">Track all active company projects and their leadership.</p>
           </div>
-          <div className="flex items-center gap-4">
-            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
-              <Filter className="w-4 h-4" /> Filter
-            </button>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
             <button 
               onClick={() => setIsAddModalOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"

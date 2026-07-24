@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireRole } from '@/lib/auth';
-import { firestoreAdminCreate } from '@/lib/firestoreAdmin';
+import { firestoreAdminCreate, firestoreAdminList } from '@/lib/firestoreAdmin';
 import { logActivityServer } from '@/lib/activityLog';
+import { sendNotification } from '@/lib/notifications';
 import {
   isStorageCategory,
   canUploadToCategory,
@@ -68,6 +69,25 @@ export const POST = requireRole([], async (req) => {
       actorId: req.user.uid,
       actorName,
     });
+
+    // Notify admins and leads about the new document
+    try {
+      const allUsers = await firestoreAdminList('users');
+      const notifyUsers = allUsers
+        .filter((u: any) => (u.role === 'admin' || u.role === 'lead') || u.id === req.user.uid)
+        .map((u: any) => u.id);
+
+      if (notifyUsers.length > 0) {
+        await sendNotification(notifyUsers, {
+          title: 'New Document Uploaded',
+          message: `${actorName} uploaded "${title.trim()}" to ${category}.`,
+          type: 'document_uploaded',
+          link: `/dashboard/${req.user.role === 'user' ? 'user' : req.user.role}/documents`, 
+        });
+      }
+    } catch (err) {
+      console.error('[API Documents] Error sending notifications:', err);
+    }
 
     return NextResponse.json(
       { success: true, documentId, message: 'Document recorded.' },

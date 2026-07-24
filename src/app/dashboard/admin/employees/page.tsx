@@ -5,14 +5,17 @@ import { useEffect } from 'react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { X } from 'lucide-react';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function AdminEmployees() {
   const router = useRouter();
+  const { user } = useAuth();
   const [employees, setEmployees] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   useEffect(() => {
+    if (!user) return; // Wait for auth to resolve before fetching
     const unsubUsers = onSnapshot(query(collection(db, 'users'), where('role', '==', 'user')), snapshot => {
       setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -20,7 +23,7 @@ export default function AdminEmployees() {
       setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => { unsubUsers(); unsubTasks(); };
-  }, []);
+  }, [user]);
 
   return (
     <div className="font-sans text-gray-800 bg-[#F8FAFC] p-6 lg:p-8 min-h-full w-full relative">
@@ -51,8 +54,18 @@ export default function AdminEmployees() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {employees.map((employee, idx) => {
-                const activeTasks = tasks.filter(t => t.assigneeId === employee.id && t.status !== 'Completed').length;
-                const workload = activeTasks * 15; // Mock calculation
+                let activeTasks = 0;
+                let weightedScore = 0;
+                tasks.forEach(t => {
+                  if (t.status !== 'Completed') {
+                    const assignees = Array.isArray(t.assignees) ? t.assignees : (t.assigneeId ? [t.assigneeId] : []);
+                    if (assignees.includes(employee.id)) {
+                      activeTasks += 1;
+                      weightedScore += 1 / assignees.length;
+                    }
+                  }
+                });
+                const workload = Math.min(100, Math.round((weightedScore / 10) * 100)); // Assuming 10 full tasks = 100%
                 
                 const getWorkloadColor = (val: number) => {
                   if (val > 70) return 'bg-orange-500';
@@ -115,6 +128,19 @@ export default function AdminEmployees() {
                 );
               })}
             </tbody>
+            {employees.length === 0 && (
+              <tbody>
+                <tr>
+                  <td colSpan={4} className="py-12 text-center text-gray-500">
+                    <div className="flex flex-col items-center justify-center">
+                      <svg className="w-12 h-12 text-gray-300 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                      <p className="text-sm font-medium">No team members</p>
+                      <p className="text-xs text-gray-400 mt-1">Add a new member to get started.</p>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            )}
           </table>
         </div>
       </div>

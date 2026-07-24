@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
+import NotificationBell from '@/components/NotificationBell';
+import AdminSearch from '@/components/AdminSearch';
 import { 
   LayoutDashboard, Briefcase, Users, UserCircle, Bell, Settings, LogOut, FolderOpen,
   CheckSquare, CalendarDays, GitPullRequest, BarChart3, Activity, Calendar, Search,
@@ -108,36 +110,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Top Header */}
         <header className="h-16 shrink-0 bg-white border-b border-gray-200 flex items-center justify-between px-8">
           {/* Search Bar */}
-          <div className="relative w-80">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="Search across workspace..." 
-              className="w-full pl-9 pr-4 py-2 bg-gray-50/50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-            />
-          </div>
+          <AdminSearch />
 
           <div className="flex items-center gap-6">
             {/* Notifications Dropdown */}
-            <div className="relative">
-              <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="relative text-gray-500 hover:text-gray-700">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-              </button>
-              {isNotifOpen && (
-                <div className="absolute right-0 mt-3 w-72 bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
-                  <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center">
-                    <span className="text-sm font-bold text-gray-900">Notifications</span>
-                    <button onClick={() => setIsNotifOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors" title="Close notifications">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="max-h-64 overflow-y-auto">
-                    <p className="px-4 py-6 text-[12px] text-gray-500 text-center">No new notifications.</p>
-                  </div>
-                </div>
-              )}
-            </div>
+            <NotificationBell />
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="text-sm font-medium text-gray-900">Admin User</p>

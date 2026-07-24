@@ -78,7 +78,6 @@ export default function AdminRolesPermissionsRBAC() {
                 <th className="px-6 py-4 font-medium">User Details</th>
                 <th className="px-6 py-4 font-medium">Department / Title</th>
                 <th className="px-6 py-4 font-medium text-center">System Role</th>
-                <th className="px-6 py-4 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -109,11 +108,6 @@ export default function AdminRolesPermissionsRBAC() {
                       <option value="user">Employee (User)</option>
                       <option value="pending">Pending</option>
                     </select>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-                      View Audit Log
-                    </button>
                   </td>
                 </tr>
               ))}

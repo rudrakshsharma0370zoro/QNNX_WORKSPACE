@@ -26,8 +26,9 @@ export default function UserMeetings() {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const mine = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-      mine.sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
-      setMeetings(mine);
+      const visible = mine.filter(m => !m.isHidden);
+      visible.sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
+      setMeetings(visible);
     });
 
     return () => unsubscribe();
