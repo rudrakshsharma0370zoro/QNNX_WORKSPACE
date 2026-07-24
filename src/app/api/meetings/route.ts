@@ -4,12 +4,11 @@ import { requireRole } from '@/lib/auth';
 import { firestoreAdminCreate, firestoreAdminUpdate } from '@/lib/firestoreAdmin';
 import { logActivityServer } from '@/lib/activityLog';
 
-async function generateGoogleMeetLink(title: string, startTime: string): Promise<string | null> {
-  // Google API library relies on Node.js core modules (http/https/net/tls) which are not available in Cloudflare Edge.
-  // Returning a free Jitsi alternative instead.
-  console.warn('Google Meet link generation is disabled in Edge Runtime. Returning a Jitsi alternative.');
-  return `https://meet.jit.si/${Math.random().toString(36).substring(2, 12)}`;
-}
+// NOTE: A Google Calendar integration using the Node-only `googleapis` package
+// used to live here. It was removed because `googleapis` is not Edge-compatible
+// and broke this route on the deployed (Cloudflare) site with a base64 decode
+// error — and it produced no link in practice anyway. Meetings use Jitsi links
+// (generated client-side) or a manually-pasted link via the `link` field.
 
 const VALID_MEETING_TYPES = ['scheduled', 'instant'] as const;
 
@@ -52,15 +51,10 @@ export const POST = requireRole(['lead', 'admin'], async (req) => {
       );
     }
 
-    let finalLink = link ? String(link).trim() : null;
-    
-    // If the frontend explicitly left the link blank, or requested a Google Meet link
-    if (!finalLink && (!platform || platform.toLowerCase().includes('google'))) {
-      const generated = await generateGoogleMeetLink(title.trim(), date);
-      if (generated) {
-        finalLink = generated;
-      }
-    }
+    // Use the link the client provides (a Jitsi room for instant meetings, or a
+    // manually-pasted Google Meet / Zoom link). Meetings saved without a link
+    // fall back to a deterministic Jitsi room via joinUrl() on the client.
+    const finalLink = link ? String(link).trim() : null;
 
     const meetingId = await firestoreAdminCreate('meetings', {
       title: title.trim(),

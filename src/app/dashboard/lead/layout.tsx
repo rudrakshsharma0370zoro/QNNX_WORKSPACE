@@ -100,11 +100,11 @@ export default function LeadLayout({ children }: { children: React.ReactNode }) 
                 className="flex items-center gap-3 hover:opacity-80 transition-opacity focus:outline-none"
               >
                 <div className="text-right hidden sm:block">
-                  <p className="text-sm font-medium text-gray-900">{user?.displayName || user?.email || 'Lead User'}</p>
+                  <p className="text-sm font-medium text-gray-900">{user?.name || user?.email || 'Lead User'}</p>
                   <p className="text-xs text-gray-500 capitalize">{role || 'Team Lead'}</p>
                 </div>
                 <div className="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-sm uppercase">
-                  {user?.displayName ? user.displayName.charAt(0) : user?.email ? user.email.charAt(0) : 'L'}
+                  {user?.name ? user.name.charAt(0) : user?.email ? user.email.charAt(0) : 'L'}
                 </div>
               </button>
               
