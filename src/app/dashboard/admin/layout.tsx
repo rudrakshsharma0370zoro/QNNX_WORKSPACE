@@ -6,17 +6,13 @@ import { useAuth } from '@/components/AuthProvider';
 import NotificationBell from '@/components/NotificationBell';
 import GlobalSearch from '@/components/GlobalSearch';
 import { 
-  LayoutDashboard, Briefcase, Users, UserCircle, Bell, Settings, LogOut, FolderOpen,
-  CheckSquare, CalendarDays, GitPullRequest, BarChart3, Activity, Calendar, Search,
-  Building2, ShieldCheck, UserCog, Server, HardDrive, Mail, Plug, DatabaseBackup, Lock, LifeBuoy, User, X
+  LayoutDashboard, Briefcase, Users, UserCircle, FolderOpen, CheckSquare, CalendarDays, ShieldCheck, Settings, LogOut
 } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, role, loading, logout } = useAuth();
-  const [isNotifOpen, setIsNotifOpen] = useState(false);
-  
+  const { user, profile, role, loading, logout } = useAuth();
   useEffect(() => {
     if (!loading && (!user || role !== 'admin')) {
       router.push('/');
@@ -117,11 +113,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <NotificationBell />
             <div className="flex items-center gap-3">
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">Admin User</p>
+                <p className="text-sm font-medium text-gray-900">{profile?.name || user?.email?.split('@')[0] || 'Admin User'}</p>
                 <p className="text-xs text-gray-500">System Administrator</p>
               </div>
-              <Link href="/dashboard/admin/profile" className="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-sm hover:ring-2 hover:ring-indigo-200 transition-all">
-                A
+              <Link href="/dashboard/admin/profile" className="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-sm hover:ring-2 hover:ring-indigo-200 transition-all uppercase">
+                {profile?.name?.charAt(0) || user?.email?.charAt(0) || 'A'}
               </Link>
             </div>
           </div>

@@ -1,6 +1,11 @@
 node_modules
 
 .next/
+
+# Local env — only truly-local secrets. .env.production holds public
+# NEXT_PUBLIC_* Firebase values needed by the Cloudflare build, so it is
+# tracked. firestore.rules is source-of-truth for security rules and is
+# tracked too.
 .env
 .env.local
 .env*.local
@@ -17,6 +22,3 @@ tsconfig.tsbuildinfo
 # Cloudflare local state
 .wrangler/
 .dev.vars
-.env.production
-
-firestore.rules

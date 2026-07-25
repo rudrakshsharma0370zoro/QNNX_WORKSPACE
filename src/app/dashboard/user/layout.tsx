@@ -25,13 +25,13 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
     }
   }, [user, role, loading, router]);
 
-  const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   // Draft state for the Edit Profile modal, seeded from the real signed-in
   // profile once it loads (replaces the previous hardcoded "John Doe").
   const [profileData, setProfileData] = useState({ name: '', role: 'Employee', email: '' });
   const [deleting, setDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -41,29 +41,6 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   }, [profile]);
 
   const displayName = profile?.name || user?.email || 'User';
-
-  // Real "notification" content: this user's own upcoming meetings. There is
-  // no dedicated per-user notifications collection yet — activityLog is
-  // admin/lead only by design (firestore.rules) — so meetings the user is
-  // actually invited to is the honest, currently-available substitute for
-  // what used to be two hardcoded fake cards ("New Task Assigned",
-  // "Sprint Planning starts in 15 minutes").
-  const [upcomingMeetings, setUpcomingMeetings] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-    const q = query(collection(db, 'meetings'), where('participants', 'array-contains', user.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const mine = snapshot.docs
-        .map(d => ({ id: d.id, ...d.data() })) as any[];
-      const upcoming = mine
-        .filter(m => isUpcoming(m.date))
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        .slice(0, 5);
-      setUpcomingMeetings(upcoming);
-    });
-    return () => unsubscribe();
-  }, [user?.uid]);
 
   const navItems = [
     { name: 'Dashboard', href: '/dashboard/user', icon: LayoutDashboard },
@@ -247,11 +224,30 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
                 {deleting ? 'Deleting...' : 'Delete Account'}
               </button>
               <div className="flex gap-3">
-                <button onClick={() => setIsProfileOpen(false)} className="px-4 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                <button onClick={() => setIsProfileOpen(false)} disabled={saving} className="px-4 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50">
                   Cancel
                 </button>
-                <button onClick={() => setIsProfileOpen(false)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 transition-colors">
-                  Save Changes
+                <button 
+                  onClick={async () => {
+                    if (!user?.uid) return;
+                    setSaving(true);
+                    setError('');
+                    try {
+                      await fetchWithAuth(`/api/users/${user.uid}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ name: profileData.name }),
+                      });
+                      setIsProfileOpen(false);
+                    } catch (err: any) {
+                      setError(err.message || 'Failed to update profile');
+                    } finally {
+                      setSaving(false);
+                    }
+                  }} 
+                  disabled={saving}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </div>

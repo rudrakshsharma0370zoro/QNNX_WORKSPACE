@@ -68,7 +68,7 @@ export default function UserOverview() {
     // rows: a plain user listing all tasks is denied entirely, so filtering in
     // memory afterwards would return nothing.
     const unsubTasks = onSnapshot(
-      query(collection(db, 'tasks'), where('assigneeId', '==', CURRENT_USER_ID)),
+      query(collection(db, 'tasks'), where('assignees', 'array-contains', CURRENT_USER_ID)),
       (snapshot) => {
         setAllTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       }
@@ -126,7 +126,9 @@ export default function UserOverview() {
         
         {/* Header */}
         <div className="mb-8">
-          <h2 className="text-[22px] font-bold text-[#111827]">Good Morning, {authUser?.displayName || authUser?.email?.split('@')[0] || 'User'}</h2>
+          <h2 className="text-[22px] font-bold text-[#111827]">
+            {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 18 ? 'Good Afternoon' : 'Good Evening'}, {authUser?.displayName || authUser?.email?.split('@')[0] || 'User'}
+          </h2>
           <p className="text-[13px] text-gray-500 mt-1">Here is the overview of your workday and pending assignments.</p>
         </div>
 

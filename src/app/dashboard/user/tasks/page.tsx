@@ -77,7 +77,7 @@ export default function UserTasks() {
                   <tr key={task.id} className="hover:bg-indigo-50/30 transition-colors group">
                     <td className="px-6 py-4 w-1/2">
                       <div className="font-semibold text-gray-900 text-[14px] group-hover:text-indigo-600 transition-colors">{task.title}</div>
-                      <div className="text-[12px] text-gray-400 mt-1">Due: Oct 25, 2026</div>
+                      <div className="text-[12px] text-gray-400 mt-1">Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No due date'}</div>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-[13px] font-medium text-gray-600">{project?.name || 'General'}</span>
