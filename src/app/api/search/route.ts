@@ -67,15 +67,21 @@ export const GET = requireRole(['admin', 'lead', 'user'], async (req) => {
       (d.filename && d.filename.toLowerCase().includes(query))
     );
 
+    const basePath = role === 'admin' ? '/dashboard/admin' : `/dashboard/${role}`;
+    
     // Map matched items into a unified result set
     const unifiedResults: any[] = [];
     
     matchedUsers.forEach((u: any) => {
+      let userUrl = `${basePath}/employees/${u.id}`; // Default for admin
+      if (role === 'lead') userUrl = `${basePath}/team`;
+      if (role === 'user') userUrl = '#'; // Users can't view other users
+
       unifiedResults.push({
         id: u.id,
         title: u.name || 'Unknown User',
         type: 'employee',
-        url: `/dashboard/admin/employees/${u.id}`,
+        url: userUrl,
         subtitle: u.email || 'No email'
       });
     });
@@ -85,8 +91,28 @@ export const GET = requireRole(['admin', 'lead', 'user'], async (req) => {
         id: d.id,
         title: d.title || d.name || d.filename || 'Untitled Document',
         type: 'document',
-        url: '/dashboard/admin/documents', // We route them to the documents overview
+        url: `${basePath}/documents`,
         subtitle: d.category || 'Document'
+      });
+    });
+
+    matchedProjects.forEach((p: any) => {
+      unifiedResults.push({
+        id: p.id,
+        title: p.name || 'Untitled Project',
+        type: 'project',
+        url: role === 'user' ? `${basePath}/projects/${p.id}` : `${basePath}/projects`,
+        subtitle: p.status || 'Active'
+      });
+    });
+
+    matchedTasks.forEach((t: any) => {
+      unifiedResults.push({
+        id: t.id,
+        title: t.title || 'Untitled Task',
+        type: 'task',
+        url: `${basePath}/tasks`,
+        subtitle: t.status || 'Pending'
       });
     });
 

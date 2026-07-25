@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import NotificationBell from '@/components/NotificationBell';
-import AdminSearch from '@/components/AdminSearch';
+import GlobalSearch from '@/components/GlobalSearch';
 import { 
   LayoutDashboard, Briefcase, Users, UserCircle, Bell, Settings, LogOut, FolderOpen,
   CheckSquare, CalendarDays, GitPullRequest, BarChart3, Activity, Calendar, Search,
@@ -110,7 +110,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Top Header */}
         <header className="h-16 shrink-0 bg-white border-b border-gray-200 flex items-center justify-between px-8">
           {/* Search Bar */}
-          <AdminSearch />
+          <GlobalSearch />
 
           <div className="flex items-center gap-6">
             {/* Notifications Dropdown */}

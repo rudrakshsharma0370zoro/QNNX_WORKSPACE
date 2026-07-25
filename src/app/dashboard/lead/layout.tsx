@@ -4,7 +4,8 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Bell, Settings, LogOut, Briefcase, Moon, X, Search, Clock } from 'lucide-react';
+import GlobalSearch from '@/components/GlobalSearch';
+import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Bell, Settings, LogOut, Briefcase, Moon, X, Clock } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 
@@ -33,12 +34,7 @@ export default function LeadLayout({ children }: { children: React.ReactNode }) 
     return () => unsubscribe();
   }, [user]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/dashboard/lead/search?q=${encodeURIComponent(searchQuery)}`);
-    }
-  };
+
 
   if (loading || !user || role !== 'lead') {
     return (
@@ -95,16 +91,7 @@ export default function LeadLayout({ children }: { children: React.ReactNode }) 
         {/* Top Header */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8">
           {/* Search Bar */}
-          <form onSubmit={handleSearch} className="relative w-80">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="Search across workspace..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-gray-50/50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-            />
-          </form>
+          <GlobalSearch />
 
           <div className="flex items-center gap-6">
             {/* Notifications Dropdown */}

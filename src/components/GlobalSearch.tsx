@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, FileText, User, Loader2, X } from 'lucide-react';
+import { Search, FileText, User, Loader2, X, Briefcase, CheckSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
-export default function AdminSearch() {
+export default function GlobalSearch() {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [results, setResults] = useState<any[] | null>(null);
@@ -90,7 +90,7 @@ export default function AdminSearch() {
             setIsOpen(true);
           }
         }}
-        placeholder="Search Documents & Employees..." 
+        placeholder="Search across workspace..." 
         className="w-full pl-9 pr-9 py-2 bg-gray-50/50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
       />
       {query && (
@@ -118,13 +118,22 @@ export default function AdminSearch() {
                     <div className="mb-2">
                       {results.map((item: any) => (
                         <button 
-                          key={item.id}
+                          key={`${item.type}-${item.id}`}
                           onClick={() => handleResultClick(item)}
                           className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center gap-3"
                         >
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${item.type === 'employee' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                            item.type === 'employee' ? 'bg-indigo-100 text-indigo-700' : 
+                            item.type === 'project' ? 'bg-blue-100 text-blue-700' :
+                            item.type === 'task' ? 'bg-orange-100 text-orange-700' :
+                            'bg-emerald-100 text-emerald-700'
+                          }`}>
                             {item.type === 'employee' ? (
                               item.title.charAt(0)
+                            ) : item.type === 'project' ? (
+                              <Briefcase className="w-4 h-4" />
+                            ) : item.type === 'task' ? (
+                              <CheckSquare className="w-4 h-4" />
                             ) : (
                               <FileText className="w-4 h-4" />
                             )}
