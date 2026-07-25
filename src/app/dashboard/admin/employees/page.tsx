@@ -31,7 +31,7 @@ export default function AdminEmployees() {
         
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-[22px] font-bold text-[#111827]">Team Members</h2>
+            <h2 className="text-[22px] font-bold text-[#111827]">Employee status</h2>
             <p className="text-[13px] text-gray-500 mt-1">Manage your team, view roles, and monitor workload distribution.</p>
           </div>
           <button 
