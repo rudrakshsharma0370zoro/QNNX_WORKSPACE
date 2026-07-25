@@ -84,10 +84,8 @@ export default function AdminTasks() {
   const handleFileUpload = async (file: File) => {
     try {
       setUploading(true);
-      const token = await auth.currentUser?.getIdToken();
-      const presignRes = await fetch('/api/uploads/presign', {
+      const presignRes = await fetchWithAuth('/api/uploads/presign', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ filename: file.name, contentType: file.type, category: 'task-files', size: file.size })
       });
       const presignData = await presignRes.json();

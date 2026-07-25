@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, FileText, User, Loader2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 export default function AdminSearch() {
   const [query, setQuery] = useState('');
@@ -35,12 +36,7 @@ export default function AdminSearch() {
       if (!user) return;
       setIsLoading(true);
       try {
-        const token = await user.getIdToken();
-        const res = await fetch(`/api/search?q=${encodeURIComponent(debouncedQuery)}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const res = await fetchWithAuth(`/api/search?q=${encodeURIComponent(debouncedQuery)}`);
         const data = await res.json();
         if (data.success) {
           setResults(data.results || []);

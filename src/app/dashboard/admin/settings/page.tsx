@@ -4,6 +4,7 @@ import { User, Building, Bell, Shield, CloudUpload, Save, ChevronDown, Loader2, 
 import { auth } from '@/config/firebaseConfig';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { useTheme } from 'next-themes';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 export default function AdminSettings() {
   const [activeTab, setActiveTab] = useState('profile');
@@ -67,11 +68,8 @@ export default function AdminSettings() {
   const fetchData = async (user: any) => {
     try {
       setLoading(true);
-      const token = await user.getIdToken();
       
-      const userRes = await fetch(`/api/users/${user.uid}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const userRes = await fetchWithAuth(`/api/users/${user.uid}`);
       if (userRes.ok) {
         const userData = await userRes.json();
         if (userData.success && userData.profile) {
@@ -115,13 +113,8 @@ export default function AdminSettings() {
   const handleSaveProfile = async () => {
     try {
       setSaving(true);
-      const token = await auth.currentUser?.getIdToken();
-      const res = await fetch(`/api/users/${uid}`, {
+      const res = await fetchWithAuth(`/api/users/${uid}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({
           name: `${profile.firstName} ${profile.lastName}`.trim(),
           avatarUrl: profile.avatarUrl,
@@ -141,13 +134,8 @@ export default function AdminSettings() {
 
   const savePreferences = async (newPrefs: any) => {
     try {
-      const token = await auth.currentUser?.getIdToken();
-      await fetch(`/api/users/${uid}`, {
+      await fetchWithAuth(`/api/users/${uid}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({ preferences: newPrefs })
       });
     } catch (err) {
@@ -233,10 +221,8 @@ export default function AdminSettings() {
       if (confirm('Final warning: All your data will be permanently erased.')) {
         try {
           setSaving(true);
-          const token = await auth.currentUser?.getIdToken();
-          const res = await fetch(`/api/users/${uid}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+          const res = await fetchWithAuth(`/api/users/${uid}`, {
+            method: 'DELETE'
           });
           if (!res.ok) throw new Error('Failed to delete account');
           
@@ -256,13 +242,8 @@ export default function AdminSettings() {
   };
 
   const uploadFile = async (file: File, category: string) => {
-    const token = await auth.currentUser?.getIdToken();
-    const presignRes = await fetch('/api/uploads/presign', {
+    const presignRes = await fetchWithAuth('/api/uploads/presign', {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
       body: JSON.stringify({
         filename: file.name,
         contentType: file.type,
@@ -294,13 +275,8 @@ export default function AdminSettings() {
       const objectUrl = URL.createObjectURL(file);
       setProfile(prev => ({ ...prev, avatarUrl: objectUrl }));
       
-      const token = await auth.currentUser?.getIdToken();
-      await fetch(`/api/users/${uid}`, {
+      await fetchWithAuth(`/api/users/${uid}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({ avatarUrl: objectUrl }) 
       });
       showMessage('Avatar uploaded!');

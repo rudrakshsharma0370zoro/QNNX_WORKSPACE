@@ -7,7 +7,7 @@ import {
 import Link from 'next/link';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -21,6 +21,39 @@ import {
 } from 'chart.js';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
+
+const barChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false }
+  },
+  scales: {
+    y: {
+      beginAtZero: true,
+      grid: { color: '#f3f4f6', drawBorder: false },
+      ticks: { stepSize: 5, font: { size: 11 }, color: '#9ca3af' },
+      border: { display: false }
+    },
+    x: {
+      grid: { display: false, drawBorder: false },
+      ticks: { font: { size: 11 }, color: '#9ca3af' },
+      border: { display: false }
+    }
+  },
+};
+
+const getDayCounts = (tasksArray: any[], targetStatus: string) => {
+  const days = [0, 0, 0, 0, 0, 0, 0]; // Mon-Sun
+  tasksArray.filter(t => t.status === targetStatus).forEach(t => {
+    if (!t.createdAt) return;
+    const date = typeof t.createdAt.toDate === 'function' ? t.createdAt.toDate() : new Date(t.createdAt);
+    let dayIndex = date.getDay() - 1;
+    if (dayIndex === -1) dayIndex = 6;
+    days[dayIndex]++;
+  });
+  return days;
+};
 
 export default function LeadDashboard() {
   const [tasks, setTasks] = useState<any[]>([]);
@@ -46,34 +79,27 @@ export default function LeadDashboard() {
   }, []);
 
   // Apply time filter
-  const filteredTasks = tasks.filter(t => {
-    if (timeFilter === 'all') return true;
-    if (!t.createdAt) return false;
-    const date = typeof t.createdAt.toDate === 'function' ? t.createdAt.toDate() : new Date(t.createdAt);
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    return date >= oneWeekAgo;
-  });
-
-  const completedTasks = filteredTasks.filter(t => t.status === 'Completed').length;
-  const inProgressTasks = filteredTasks.filter(t => t.status === 'In Progress').length;
-  const pendingTasks = filteredTasks.filter(t => t.status === 'Pending').length;
-  const activeTeamMembers = users.filter(u => u.role === 'user').length;
-
-  // Dynamic Bar Chart Data Grouping
-  const getDayCounts = (tasksArray: any[], targetStatus: string) => {
-    const days = [0, 0, 0, 0, 0, 0, 0]; // Mon-Sun
-    tasksArray.filter(t => t.status === targetStatus).forEach(t => {
-      if (!t.createdAt) return;
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(t => {
+      if (timeFilter === 'all') return true;
+      if (!t.createdAt) return false;
       const date = typeof t.createdAt.toDate === 'function' ? t.createdAt.toDate() : new Date(t.createdAt);
-      let dayIndex = date.getDay() - 1;
-      if (dayIndex === -1) dayIndex = 6;
-      days[dayIndex]++;
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      return date >= oneWeekAgo;
     });
-    return days;
-  };
+  }, [tasks, timeFilter]);
 
-  const barChartData = {
+  const { completedTasks, inProgressTasks, pendingTasks, activeTeamMembers } = useMemo(() => {
+    return {
+      completedTasks: filteredTasks.filter(t => t.status === 'Completed').length,
+      inProgressTasks: filteredTasks.filter(t => t.status === 'In Progress').length,
+      pendingTasks: filteredTasks.filter(t => t.status === 'Pending').length,
+      activeTeamMembers: users.filter(u => u.role === 'user').length
+    };
+  }, [filteredTasks, users]);
+
+  const barChartData = useMemo(() => ({
     labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     datasets: [
       {
@@ -93,69 +119,58 @@ export default function LeadDashboard() {
         categoryPercentage: 0.6,
       },
     ],
-  };
-
-  const barChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        grid: { color: '#f3f4f6', drawBorder: false },
-        ticks: { stepSize: 5, font: { size: 11 }, color: '#9ca3af' },
-        border: { display: false }
-      },
-      x: {
-        grid: { display: false, drawBorder: false },
-        ticks: { font: { size: 11 }, color: '#9ca3af' },
-        border: { display: false }
-      }
-    },
-  };
+  }), [filteredTasks]);
 
   // Doughnut Chart Data
   const totalTasks = filteredTasks.length;
-  const doughnutData = {
-    labels: ['Completed', 'In Progress', 'Pending'],
-    datasets: [
-      {
-        data: totalTasks === 0 ? [1] : [completedTasks, inProgressTasks, pendingTasks],
-        backgroundColor: totalTasks === 0 ? ['#f3f4f6'] : ['#10b981', '#3b82f6', '#ef4444'],
-        borderWidth: 0,
-        cutout: '75%',
-      },
-    ],
-  };
-
-  const doughnutOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: { enabled: totalTasks > 0 }
+  const { doughnutData, doughnutOptions } = useMemo(() => ({
+    doughnutData: {
+      labels: ['Completed', 'In Progress', 'Pending'],
+      datasets: [
+        {
+          data: totalTasks === 0 ? [1] : [completedTasks, inProgressTasks, pendingTasks],
+          backgroundColor: totalTasks === 0 ? ['#f3f4f6'] : ['#10b981', '#3b82f6', '#ef4444'],
+          borderWidth: 0,
+          cutout: '75%',
+        },
+      ],
+    },
+    doughnutOptions: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: totalTasks > 0 }
+      }
     }
-  };
+  }), [totalTasks, completedTasks, inProgressTasks, pendingTasks]);
 
   // Calculate Top Team Members dynamically
-  const userTaskCounts: Record<string, number> = {};
-  filteredTasks.forEach(t => {
-    if (t.assigneeId) {
-      userTaskCounts[t.assigneeId] = (userTaskCounts[t.assigneeId] || 0) + 1;
-    }
-  });
-  
-  const topTeamMembers = users
-    .filter(u => u.role === 'user')
-    .map(u => ({
-      id: u.id,
-      name: u.name || 'Unknown User',
-      tasks: userTaskCounts[u.id] || 0,
-    }))
-    .sort((a, b) => b.tasks - a.tasks)
-    .slice(0, 4);
+  const topTeamMembers = useMemo(() => {
+    const userTaskCounts: Record<string, number> = {};
+    filteredTasks.forEach(t => {
+      if (t.assigneeId) {
+        userTaskCounts[t.assigneeId] = (userTaskCounts[t.assigneeId] || 0) + 1;
+      }
+    });
+    
+    return users
+      .filter(u => u.role === 'user')
+      .map(u => ({
+        id: u.id,
+        name: u.name || 'Unknown User',
+        tasks: userTaskCounts[u.id] || 0,
+      }))
+      .sort((a, b) => b.tasks - a.tasks)
+      .slice(0, 4);
+  }, [filteredTasks, users]);
+
+  const formattedLogs = useMemo(() => {
+    return logs.map(log => ({
+      ...log,
+      formattedDate: new Date(log.createdAt).toLocaleString()
+    }));
+  }, [logs]);
 
   return (
     <div className="font-sans text-gray-800 bg-gray-50/30 p-6 lg:p-8 min-h-full w-full">
@@ -387,14 +402,14 @@ export default function LeadDashboard() {
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
             <h3 className="font-bold text-gray-900 mb-6">Recent Activity</h3>
             <div className="space-y-6 relative before:absolute before:inset-0 before:ml-2.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-200 before:to-transparent">
-              {logs.length > 0 ? logs.map((log) => (
+              {formattedLogs.length > 0 ? formattedLogs.map((log) => (
                 <div key={log.id} className="relative flex items-start gap-4">
                   <div className="w-5 h-5 rounded-full bg-white border-2 z-10 flex items-center justify-center mt-0.5 shrink-0 border-indigo-500">
                     <CheckCircle2 className="w-3 h-3 text-indigo-500" />
                   </div>
                   <div>
                     <p className="text-sm text-gray-700">{log.message}</p>
-                    <p className="text-xs text-gray-400 mt-1">{new Date(log.createdAt).toLocaleString()}</p>
+                    <p className="text-xs text-gray-400 mt-1">{log.formattedDate}</p>
                   </div>
                 </div>
               )) : (

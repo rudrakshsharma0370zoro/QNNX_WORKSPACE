@@ -6,6 +6,7 @@ import { collection, query, orderBy, onSnapshot, updateDoc, doc } from 'firebase
 import { db } from '@/config/firebaseConfig';
 import { useAuth } from '@/components/AuthProvider';
 import { useRouter } from 'next/navigation';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 export interface Notification {
   id: string;
@@ -61,13 +62,8 @@ export default function NotificationBell() {
   const handleNotificationClick = async (notif: Notification) => {
     if (!notif.read && user) {
       try {
-        const token = await user.getIdToken();
-        await fetch('/api/notifications/mark-read', {
+        await fetchWithAuth('/api/notifications/mark-read', {
           method: 'PATCH',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
           body: JSON.stringify({ notificationId: notif.id })
         });
       } catch (err) {
@@ -83,13 +79,8 @@ export default function NotificationBell() {
   const markAllAsRead = async () => {
     if (!user) return;
     try {
-      const token = await user.getIdToken();
-      await fetch('/api/notifications/mark-read', {
+      await fetchWithAuth('/api/notifications/mark-read', {
         method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({ all: true })
       });
     } catch (err) {

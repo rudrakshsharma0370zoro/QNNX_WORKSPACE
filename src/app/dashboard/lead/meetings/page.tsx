@@ -17,6 +17,7 @@ interface Meeting {
   participants?: string[];
   type?: 'scheduled' | 'instant';
   isHidden?: boolean;
+  createdBy?: string;
 }
 
 interface AppUser {

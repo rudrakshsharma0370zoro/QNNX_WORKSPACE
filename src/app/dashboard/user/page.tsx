@@ -6,7 +6,7 @@ import {
 import { useAuth } from '@/components/AuthProvider';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Chart as ChartJS, 
   CategoryScale, 
@@ -20,6 +20,33 @@ import {
 import { Bar, Doughnut } from 'react-chartjs-2';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
+
+const doughnutOptions = {
+  cutout: '75%',
+  plugins: {
+    legend: { position: 'bottom' as const, labels: { usePointStyle: true, boxWidth: 6, font: { size: 11, family: 'Inter' } } }
+  },
+  maintainAspectRatio: false
+};
+
+const barOptions = {
+  responsive: true,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#1E293B',
+      titleFont: { size: 13, family: 'Inter' },
+      bodyFont: { size: 12, family: 'Inter' },
+      padding: 10,
+      cornerRadius: 8,
+    }
+  },
+  scales: {
+    x: { grid: { display: false }, ticks: { font: { size: 11, family: 'Inter' }, color: '#64748B' } },
+    y: { border: { dash: [4, 4] }, grid: { color: '#F1F5F9' }, ticks: { stepSize: 1, font: { size: 11, family: 'Inter' }, color: '#64748B' }, beginAtZero: true }
+  },
+  maintainAspectRatio: false
+};
 
 export default function UserOverview() {
   const { user: authUser } = useAuth();
@@ -50,16 +77,18 @@ export default function UserOverview() {
     return () => { unsubProjects(); unsubTasks(); };
   }, [CURRENT_USER_ID]);
 
-  const myProjects = allProjects.filter(p => p.employeeIds && p.employeeIds.includes(CURRENT_USER_ID));
+  const myProjects = useMemo(() => allProjects.filter(p => p.employeeIds && p.employeeIds.includes(CURRENT_USER_ID)), [allProjects, CURRENT_USER_ID]);
   // Already scoped to this user by the query above.
   const myTasks = allTasks;
   
-  const completedTasks = myTasks.filter(t => t.status === 'Completed').length;
-  const inProgressTasks = myTasks.filter(t => t.status === 'In Progress').length;
-  const pendingTasks = myTasks.filter(t => t.status === 'Pending').length;
+  const { completedTasks, inProgressTasks, pendingTasks } = useMemo(() => ({
+    completedTasks: myTasks.filter(t => t.status === 'Completed').length,
+    inProgressTasks: myTasks.filter(t => t.status === 'In Progress').length,
+    pendingTasks: myTasks.filter(t => t.status === 'Pending').length,
+  }), [myTasks]);
 
   // Doughnut Chart Data
-  const taskStatusData = {
+  const taskStatusData = useMemo(() => ({
     labels: ['Completed', 'In Progress', 'Pending'],
     datasets: [
       {
@@ -69,51 +98,26 @@ export default function UserOverview() {
         hoverOffset: 4
       },
     ],
-  };
-
-  const doughnutOptions = {
-    cutout: '75%',
-    plugins: {
-      legend: { position: 'bottom' as const, labels: { usePointStyle: true, boxWidth: 6, font: { size: 11, family: 'Inter' } } }
-    },
-    maintainAspectRatio: false
-  };
+  }), [completedTasks, inProgressTasks, pendingTasks]);
 
   // Bar Chart Data (Tasks per Project)
-  const projectNames = myProjects.map(p => p.name);
-  const tasksPerProject = myProjects.map(p => myTasks.filter(t => t.projectId === p.id).length);
+  const projectWorkloadData = useMemo(() => {
+    const projectNames = myProjects.map(p => p.name);
+    const tasksPerProject = myProjects.map(p => myTasks.filter(t => t.projectId === p.id).length);
 
-  const projectWorkloadData = {
-    labels: projectNames,
-    datasets: [
-      {
-        label: 'Assigned Tasks',
-        data: tasksPerProject,
-        backgroundColor: '#4F46E5',
-        borderRadius: 4,
-        barPercentage: 0.5,
-      },
-    ],
-  };
-
-  const barOptions = {
-    responsive: true,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: '#1E293B',
-        titleFont: { size: 13, family: 'Inter' },
-        bodyFont: { size: 12, family: 'Inter' },
-        padding: 10,
-        cornerRadius: 8,
-      }
-    },
-    scales: {
-      x: { grid: { display: false }, ticks: { font: { size: 11, family: 'Inter' }, color: '#64748B' } },
-      y: { border: { dash: [4, 4] }, grid: { color: '#F1F5F9' }, ticks: { stepSize: 1, font: { size: 11, family: 'Inter' }, color: '#64748B' }, beginAtZero: true }
-    },
-    maintainAspectRatio: false
-  };
+    return {
+      labels: projectNames,
+      datasets: [
+        {
+          label: 'Assigned Tasks',
+          data: tasksPerProject,
+          backgroundColor: '#4F46E5',
+          borderRadius: 4,
+          barPercentage: 0.5,
+        },
+      ],
+    };
+  }, [myProjects, myTasks]);
 
 
   return (

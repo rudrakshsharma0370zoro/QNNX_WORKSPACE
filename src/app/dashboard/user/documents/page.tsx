@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Filter, Search, CloudUpload, FileText, FileSpreadsheet, Image as ImageIcon, Lock, Download, Loader2, Trash2 } from 'lucide-react';
 import { auth } from '@/config/firebaseConfig';
 import { useAuth } from '@/components/AuthProvider';
+import { useDocuments } from '@/hooks/useDocuments';
 
 // Only these categories are ever owner-deletable by a plain user — matches
 // the OWNER_CATEGORIES check in DELETE /api/documents/[id]. Company-wide
@@ -13,9 +14,7 @@ const OWNER_DELETABLE_CATEGORIES = ['task-files', 'personal-files'];
 
 export default function UserDocuments() {
   const { user } = useAuth();
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  const { documents, loading, uploading, uploadDocument, downloadDocument, deleteDocument } = useDocuments();
   const [selectedCategory, setSelectedCategory] = useState('task-files');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -26,137 +25,18 @@ export default function UserDocuments() {
     { name: 'personal-files', tier: 'My Files' },
   ];
 
-  const fetchDocuments = async () => {
-    try {
-      setLoading(true);
-      const token = await auth.currentUser?.getIdToken();
-      const res = await fetch('/api/documents', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const data = await res.json();
-      if (data.success) {
-        setDocuments(data.documents);
-      }
-    } catch (err) {
-      console.error('Failed to fetch documents', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDocuments();
-  }, []);
-
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    try {
-      setUploading(true);
-      
-      // 1. Get Presigned URL
-      const token = await auth.currentUser?.getIdToken();
-      const presignRes = await fetch('/api/uploads/presign', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          filename: file.name,
-          contentType: file.type,
-          category: selectedCategory,
-          size: file.size
-        })
-      });
-      
-      const presignData = await presignRes.json();
-      if (!presignRes.ok) throw new Error(presignData.details || 'Failed to get upload URL');
-
-      // 2. Upload to S3
-      const uploadRes = await fetch(presignData.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type },
-        body: file
-      });
-      
-      if (!uploadRes.ok) throw new Error('Failed to upload file to S3');
-
-      // 3. Save Metadata to Firestore
-      const docRes = await fetch('/api/documents', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          title: file.name,
-          category: selectedCategory,
-          s3Key: presignData.s3Key
-        })
-      });
-      
-      if (!docRes.ok) throw new Error('Failed to save document metadata');
-      
-      // 4. Refresh List
-      await fetchDocuments();
-      
-      // Reset input
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    } catch (err: any) {
-      alert(err.message || 'Upload failed');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleDownload = async (doc: any) => {
-    if (!doc.s3Key) {
-      if (doc.url) window.open(doc.url, '_blank');
-      return;
-    }
-    
-    try {
-      const token = await auth.currentUser?.getIdToken();
-      const res = await fetch('/api/uploads/download', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ s3Key: doc.s3Key })
-      });
-      
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.details || 'Download failed');
-      
-      window.open(data.downloadUrl, '_blank');
-    } catch (err: any) {
-      alert(err.message || 'Download failed');
+    const success = await uploadDocument(file, selectedCategory);
+    if (success && fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
   const canDelete = (doc: any) =>
     doc.addedBy === user?.uid && OWNER_DELETABLE_CATEGORIES.includes(doc.category);
-
-  const handleDelete = async (doc: any) => {
-    if (!confirm(`Delete "${doc.title}"? This permanently removes it from S3.`)) return;
-    try {
-      const token = await auth.currentUser?.getIdToken();
-      const res = await fetch(`/api/documents/${doc.id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.details || 'Delete failed');
-      setDocuments(prev => prev.filter(d => d.id !== doc.id));
-    } catch (err: any) {
-      alert(err.message || 'Delete failed');
-    }
-  };
 
   const getFileIcon = (filename: string) => {
     const ext = filename.split('.').pop()?.toLowerCase();
@@ -245,7 +125,7 @@ export default function UserDocuments() {
                       <td className="px-6 py-4 text-right text-gray-400">
                         <div className="flex items-center justify-end gap-2">
                           <button 
-                            onClick={() => handleDownload(doc)}
+                            onClick={() => downloadDocument(doc)}
                             className="p-1.5 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
                             title="Download from S3"
                           >
@@ -253,7 +133,7 @@ export default function UserDocuments() {
                           </button>
                           {canDelete(doc) && (
                             <button
-                              onClick={() => handleDelete(doc)}
+                              onClick={() => deleteDocument(doc)}
                               className="p-1.5 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                               title="Delete from S3"
                             >

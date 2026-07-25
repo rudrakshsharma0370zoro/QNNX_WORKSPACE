@@ -137,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       if (unsubscribeProfile) unsubscribeProfile();
+      if (unsubscribeDetails) unsubscribeDetails();
       unsubscribeAuth();
     };
   }, []);

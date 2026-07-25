@@ -37,14 +37,14 @@ export async function logActivityServer(input: ActivityInput): Promise<void> {
     });
 
     // Automatically dispatch a system notification to all admins for audit tracking
-    const allUsers = await firestoreAdminList('users');
+    const allUsers = (await firestoreAdminList('users')) as { id: string; role?: string }[];
     const adminIds = allUsers.filter(u => u.role === 'admin').map(u => u.id);
     
     if (adminIds.length > 0) {
       await sendNotification(adminIds, {
         title: 'System Activity',
         message: input.message,
-        type: input.type,
+        type: 'system',
         link: '/dashboard/admin', // Default link for admin audit activities
       });
     }
