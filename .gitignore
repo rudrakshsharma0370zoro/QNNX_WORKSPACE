@@ -17,3 +17,4 @@ tsconfig.tsbuildinfo
 # Cloudflare local state
 .wrangler/
 .dev.vars
+.env.production
