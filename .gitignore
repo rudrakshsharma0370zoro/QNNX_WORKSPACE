@@ -18,3 +18,5 @@ tsconfig.tsbuildinfo
 .wrangler/
 .dev.vars
 .env.production
+
+firestore.rules
