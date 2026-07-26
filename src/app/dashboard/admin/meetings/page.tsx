@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { newJitsiLink, joinUrl, isUpcoming } from '@/utils/meeting';
+import { newJitsiLink, joinUrl, isUpcoming, openGmailCompose } from '@/utils/meeting';
 import { useAuth } from '@/components/AuthProvider';
 import { X, Plus, Video, Users, Calendar, Clock, Zap, Trash2 } from 'lucide-react';
 
@@ -180,12 +180,19 @@ export default function AdminMeetings() {
     
     // Copy emails to clipboard
     navigator.clipboard.writeText(emails).catch(() => {});
-    
+
     // Launch mail app with BCC
-    const subject = encodeURIComponent(`Meeting Invite: ${meeting.title}`);
-    const body = encodeURIComponent(`Join us on ${meeting.platform || 'video call'} at ${meeting.time || ''} on ${new Date(meeting.date).toLocaleDateString()}.\n\nLink: ${meeting.link || joinUrl(meeting)}\n\n`);
-    
-    window.location.href = `mailto:?bcc=${emails}&subject=${subject}&body=${body}`;
+    // const subject = encodeURIComponent(`Meeting Invite: ${meeting.title}`);
+    // const body = encodeURIComponent(`Join us on ${meeting.platform || 'video call'} at ${meeting.time || ''} on ${new Date(meeting.date).toLocaleDateString()}.\n\nLink: ${meeting.link || joinUrl(meeting)}\n\n`);
+    // window.location.href = `mailto:?bcc=${emails}&subject=${subject}&body=${body}`;
+
+    // Gmail-web-compose fix: open Gmail's own compose UI in a new tab instead
+    // of handing off to the OS-default desktop mail app. Fixes SMTP timeouts
+    // on networks that block outbound mail ports, and avoids messages landing
+    // in recipients' Spam folder when relayed through a non-Gmail client.
+    const subject = `Meeting Invite: ${meeting.title}`;
+    const body = `Join us on ${meeting.platform || 'video call'} at ${meeting.time || ''} on ${new Date(meeting.date).toLocaleDateString()}.\n\nLink: ${meeting.link || joinUrl(meeting)}\n\n`;
+    openGmailCompose({ bcc: emails, subject, body });
   };
 
   const handleJoin = (meeting: Meeting) => {
