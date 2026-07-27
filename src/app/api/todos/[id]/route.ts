@@ -20,8 +20,8 @@ export const PATCH = requireRole(['admin', 'lead', 'user'], async (req, { params
     if (!todo) {
       return NextResponse.json({ error: 'Todo not found' }, { status: 404 });
     }
-    if (todo.userId !== uid) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (!todo.userId || String(todo.userId) !== String(uid)) {
+      return NextResponse.json({ error: 'Unauthorized: Cannot edit another user\'s to-do item' }, { status: 403 });
     }
 
     if (body.isComplete !== undefined) {
@@ -52,8 +52,8 @@ export const DELETE = requireRole(['admin', 'lead', 'user'], async (req, { param
     if (!todo) {
       return NextResponse.json({ error: 'Todo not found' }, { status: 404 });
     }
-    if (todo.userId !== uid) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (!todo.userId || String(todo.userId) !== String(uid)) {
+      return NextResponse.json({ error: 'Unauthorized: Cannot delete another user\'s to-do item' }, { status: 403 });
     }
 
     await firestoreAdminDelete('todos', id);

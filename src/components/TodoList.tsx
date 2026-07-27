@@ -72,10 +72,14 @@ export default function TodoList() {
         method: 'PATCH',
         body: JSON.stringify({ isComplete: newStatus })
       });
-      if (!res.ok) throw new Error('Failed to update status');
-    } catch (err) {
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to update status');
+      }
+    } catch (err: any) {
       // Revert on error
       setTodos(todos.map(t => t.id === todo.id ? { ...t, isComplete: !newStatus } : t));
+      alert(err.message || 'Unauthorized or failed to update to-do item');
       console.error(err);
     }
   };
@@ -91,10 +95,14 @@ export default function TodoList() {
       const res = await fetchWithAuth(`/api/todos/${id}`, {
         method: 'DELETE'
       });
-      if (!res.ok) throw new Error('Failed to delete to-do');
-    } catch (err) {
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to delete to-do');
+      }
+    } catch (err: any) {
       // Revert on error
       setTodos(previousTodos);
+      alert(err.message || 'Unauthorized or failed to delete to-do item');
       console.error(err);
     }
   };

@@ -4,17 +4,18 @@ import { firestoreAdminList, firestoreAdminCreate } from '@/lib/firestoreAdmin';
 
 export const runtime = 'edge';
 
-// GET all todos for the strictly logged-in user
+// GET all todos for the strictly logged-in user (NO ONE can view another user's to-do list, including admins)
 export const GET = requireRole(['admin', 'lead', 'user'], async (req) => {
   try {
     const uid = req.user.uid;
-    // Strictly filter by userId
-    const allTodos = await firestoreAdminList('todos', 'userId', '==', uid);
+    // Fetch all todos and strictly filter in-memory by userId matching the logged-in user's uid
+    const allDocs = await firestoreAdminList('todos');
+    const allTodos = allDocs.filter((todo: any) => todo.userId && String(todo.userId) === String(uid));
     
     // Sort by createdAt descending since Firestore Admin list might not order them
     allTodos.sort((a: any, b: any) => {
-      const dateA = new Date(a.createdAt).getTime();
-      const dateB = new Date(b.createdAt).getTime();
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
       return dateB - dateA;
     });
 
