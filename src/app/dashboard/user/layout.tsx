@@ -11,7 +11,7 @@ import { isUpcoming } from '@/utils/meeting';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import {
   LayoutDashboard, Briefcase, CheckSquare, CalendarDays, FolderOpen,
-  Search, Bell, Settings, LogOut, X, User as UserIcon
+  Search, Bell, Settings, LogOut, X, User as UserIcon, ListTodo
 } from 'lucide-react';
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
@@ -46,6 +46,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
     { name: 'Dashboard', href: '/dashboard/user', icon: LayoutDashboard },
     { name: 'My Projects', href: '/dashboard/user/projects', icon: Briefcase },
     { name: 'My Tasks', href: '/dashboard/user/tasks', icon: CheckSquare },
+    { name: 'To-Do List', href: '/dashboard/user/todo', icon: ListTodo },
     { name: 'Meetings', href: '/dashboard/user/meetings', icon: CalendarDays },
     { name: 'Documents', href: '/dashboard/user/documents', icon: FolderOpen },
     { name: 'Settings', href: '/dashboard/user/settings', icon: Settings },

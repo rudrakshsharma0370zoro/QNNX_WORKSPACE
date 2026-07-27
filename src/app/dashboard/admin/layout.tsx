@@ -5,8 +5,8 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import NotificationBell from '@/components/NotificationBell';
 import GlobalSearch from '@/components/GlobalSearch';
-import { 
-  LayoutDashboard, Briefcase, Users, UserCircle, FolderOpen, CheckSquare, CalendarDays, ShieldCheck, Settings, LogOut
+import {
+  LayoutDashboard, Briefcase, Users, UserCircle, FolderOpen, CheckSquare, CalendarDays, ShieldCheck, Settings, LogOut, ListTodo
 } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -42,7 +42,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Leads', href: '/dashboard/admin/leads', icon: Users },
         { name: 'Teams', href: '/dashboard/admin/teams', icon: Users },
         { name: 'Projects', href: '/dashboard/admin/projects', icon: Briefcase },
-        { name: 'Tasks', href: '/dashboard/admin/tasks', icon: CheckSquare }
+        { name: 'Tasks', href: '/dashboard/admin/tasks', icon: CheckSquare },
+        { name: 'To-Do List', href: '/dashboard/admin/todo', icon: ListTodo }
       ]
     },
     {

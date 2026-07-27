@@ -6,9 +6,11 @@ import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useUsers } from '@/components/AppDataProvider';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function AdminRolesPermissionsRBAC() {
-  // const [users, setUsers] = useState<any[]>([]);
+  const { user: currentUser } = useAuth();
+  const [processingId, setProcessingId] = useState<string | null>(null);
   const rawUsers = useUsers(); // shared roster — see src/components/AppDataProvider.tsx
 
   // Same filter/dedupe/sort pipeline as before, now derived from the shared
@@ -39,15 +41,26 @@ export default function AdminRolesPermissionsRBAC() {
   }, [rawUsers]);
 
   const handleRoleChange = async (userId: string, newRole: string) => {
-    // Optimistic update
-    setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    if (currentUser?.uid === userId) {
+      alert("You cannot change your own role to prevent accidental lockouts.");
+      return;
+    }
+    setProcessingId(userId);
     try {
-      await fetchWithAuth(`/api/users/${userId}/role`, {
+      const res = await fetchWithAuth(`/api/users/${userId}/role`, {
         method: 'POST',
         body: JSON.stringify({ role: newRole.toLowerCase() }),
       });
-    } catch (error) {
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.details || data.error || 'Failed to update role');
+      }
+      // Firestore onSnapshot updates the list automatically
+    } catch (error: any) {
       console.error(error);
+      alert(error.message);
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -99,13 +112,17 @@ export default function AdminRolesPermissionsRBAC() {
                     <select 
                       value={user.role}
                       onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                      className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+                      disabled={processingId === user.id || currentUser?.uid === user.id}
+                      className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="admin">Admin</option>
                       <option value="lead">Lead</option>
                       <option value="user">Employee (User)</option>
-                      <option value="pending">Pending</option>
+                      <option value="pending" disabled>Pending</option>
                     </select>
+                    {processingId === user.id && (
+                      <div className="text-[10px] text-indigo-500 mt-1 font-medium animate-pulse">Updating...</div>
+                    )}
                   </td>
                 </tr>
               ))}

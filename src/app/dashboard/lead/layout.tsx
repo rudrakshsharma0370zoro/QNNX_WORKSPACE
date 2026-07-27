@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import GlobalSearch from '@/components/GlobalSearch';
-import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Bell, Settings, LogOut, Briefcase, Moon, X, Clock } from 'lucide-react';
+import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Bell, Settings, LogOut, Briefcase, Moon, X, Clock, ListTodo } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { useActivityLog } from '@/components/AppDataProvider';
@@ -52,6 +52,7 @@ export default function LeadLayout({ children }: { children: React.ReactNode }) 
     { name: 'Projects', href: '/dashboard/lead/projects', icon: Briefcase },
     { name: 'Team', href: '/dashboard/lead/team', icon: Users },
     { name: 'Tasks', href: '/dashboard/lead/tasks', icon: CheckSquare },
+    { name: 'To-Do List', href: '/dashboard/lead/todo', icon: ListTodo },
     { name: 'Meetings', href: '/dashboard/lead/meetings', icon: Calendar },
     { name: 'Documents', href: '/dashboard/lead/documents', icon: FolderOpen },
   ];

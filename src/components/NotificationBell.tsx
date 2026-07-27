@@ -15,6 +15,7 @@ export interface Notification {
   type: string;
   link?: string;
   read: boolean;
+  cleared?: boolean;
   createdAt: string;
 }
 
@@ -57,7 +58,8 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const visibleNotifications = notifications.filter(n => !n.cleared);
+  const unreadCount = visibleNotifications.filter((n) => !n.read).length;
 
   const handleNotificationClick = async (notif: Notification) => {
     if (!notif.read && user) {
@@ -85,6 +87,19 @@ export default function NotificationBell() {
       });
     } catch (err) {
       console.error('Failed to mark all as read:', err);
+    }
+  };
+
+  const clearAllNotifications = async () => {
+    if (!user) return;
+    // Optimistic update
+    setNotifications(notifications.map(n => ({ ...n, cleared: true })));
+    try {
+      await fetchWithAuth('/api/notifications/clear', {
+        method: 'PATCH'
+      });
+    } catch (err) {
+      console.error('Failed to clear notifications:', err);
     }
   };
 
@@ -131,6 +146,14 @@ export default function NotificationBell() {
                   Mark all as read
                 </button>
               )}
+              {visibleNotifications.length > 0 && (
+                <button 
+                  onClick={clearAllNotifications} 
+                  className="text-[11px] font-medium text-gray-500 hover:text-gray-800 transition-colors ml-2"
+                >
+                  Clear all
+                </button>
+              )}
               <button 
                 onClick={() => setIsOpen(false)} 
                 className="text-gray-400 hover:text-gray-600 transition-colors" 
@@ -142,11 +165,11 @@ export default function NotificationBell() {
           </div>
           
           <div className="max-h-96 overflow-y-auto">
-            {notifications.length === 0 ? (
+            {visibleNotifications.length === 0 ? (
               <p className="px-4 py-8 text-sm text-gray-500 text-center">No new notifications.</p>
             ) : (
               <div className="flex flex-col">
-                {notifications.map((notif) => (
+                {visibleNotifications.map((notif) => (
                   <button
                     key={notif.id}
                     onClick={() => handleNotificationClick(notif)}
