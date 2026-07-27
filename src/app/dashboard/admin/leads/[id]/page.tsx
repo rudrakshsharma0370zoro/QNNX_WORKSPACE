@@ -1,5 +1,11 @@
 "use client";
 
+// Required for Cloudflare Pages: this is a dynamic ([id]) route with no
+// generateStaticParams, so Next.js needs a server round-trip per request to
+// serve the initial shell. @cloudflare/next-on-pages only supports the Edge
+// Runtime for non-static routes (Cloudflare Workers have no Node.js runtime).
+export const runtime = 'edge';
+
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebaseClient';
