@@ -1,9 +1,10 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { useAuth } from '@/components/AuthProvider';
+import { useUsers } from '@/components/AppDataProvider';
 import { Briefcase, Users, X, Plus } from 'lucide-react';
 import MemberSelect from '@/components/MemberSelect';
 
@@ -12,7 +13,9 @@ const STATUS_OPTIONS = ['Pending', 'In Progress', 'Completed'];
 export default function LeadProjects() {
   const { user } = useAuth();
   const [allProjects, setAllProjects] = useState<any[]>([]);
-  const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+  // const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+  const allUsers = useUsers(); // shared roster — see src/components/AppDataProvider.tsx
+  const assignableUsers = useMemo(() => allUsers.filter((u: any) => u.role === 'user' || u.role === 'lead'), [allUsers]);
   const [updatingProject, setUpdatingProject] = useState<any | null>(null);
   const [statusValue, setStatusValue] = useState('In Progress');
   const [memberIds, setMemberIds] = useState<string[]>([]);
@@ -42,11 +45,11 @@ export default function LeadProjects() {
     const unsub = onSnapshot(query(collection(db, 'projects')), snapshot => {
       setAllProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    const unsubUsers = onSnapshot(query(collection(db, 'users')), snapshot => {
-      const allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setAssignableUsers(allUsers.filter((u: any) => u.role === 'user' || u.role === 'lead'));
-    });
-    return () => { unsub(); unsubUsers(); };
+    // const unsubUsers = onSnapshot(query(collection(db, 'users')), snapshot => {
+    //   const allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    //   setAssignableUsers(allUsers.filter((u: any) => u.role === 'user' || u.role === 'lead'));
+    // });
+    return () => { unsub(); };
   }, []);
 
   // A lead manages the projects they're assigned to lead — matches how

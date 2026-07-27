@@ -5,10 +5,12 @@ import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useAuth } from '@/components/AuthProvider';
+import { useUsers } from '@/components/AppDataProvider';
 
 export default function LeadTasks() {
   const [tasks, setTasks] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  // const [users, setUsers] = useState<any[]>([]);
+  const users = useUsers(); // shared roster — see src/components/AppDataProvider.tsx
   const [projects, setProjects] = useState<any[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newTask, setNewTask] = useState({ title: '', projectId: '', priority: 'Medium', assigneeId: '', status: 'Pending' });
@@ -22,13 +24,13 @@ export default function LeadTasks() {
     const unsubTasks = onSnapshot(query(collection(db, 'tasks')), snapshot => {
       setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    const unsubUsers = onSnapshot(query(collection(db, 'users')), snapshot => {
-      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    // const unsubUsers = onSnapshot(query(collection(db, 'users')), snapshot => {
+    //   setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // });
     const unsubProjects = onSnapshot(query(collection(db, 'projects')), snapshot => {
       setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => { unsubTasks(); unsubUsers(); unsubProjects(); };
+    return () => { unsubTasks(); unsubProjects(); };
   }, []);
 
   const getPriorityColor = (priority: string) => {

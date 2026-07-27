@@ -1,29 +1,32 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { Search, Edit2, Trash2, Mail, X } from 'lucide-react';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { useUsers } from '@/components/AppDataProvider';
 
 export default function AdminLeads() {
   const router = useRouter();
-  const [leads, setLeads] = useState<any[]>([]);
+  // const [leads, setLeads] = useState<any[]>([]);
+  const allUsers = useUsers(); // shared roster — see src/components/AppDataProvider.tsx
+  const leads = useMemo(() => allUsers.filter((u: any) => u.role === 'lead'), [allUsers]);
   const [projects, setProjects] = useState<any[]>([]);
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [editingLead, setEditingLead] = useState<any | null>(null);
   const [editForm, setEditForm] = useState({ name: '', department: '' });
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const unsubLeads = onSnapshot(query(collection(db, 'users'), where('role', '==', 'lead')), snapshot => {
-      setLeads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    // const unsubLeads = onSnapshot(query(collection(db, 'users'), where('role', '==', 'lead')), snapshot => {
+    //   setLeads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // });
     const unsubProjects = onSnapshot(query(collection(db, 'projects')), snapshot => {
       setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => { unsubLeads(); unsubProjects(); };
+    return () => { unsubProjects(); };
   }, []);
 
   const handleDelete = async (id: string, name: string) => {

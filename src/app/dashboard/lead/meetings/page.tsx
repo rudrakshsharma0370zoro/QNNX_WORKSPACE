@@ -6,6 +6,7 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { newJitsiLink, joinUrl, isUpcoming, openGmailCompose } from '@/utils/meeting';
 import { useAuth } from '@/components/AuthProvider';
+import { useUsers } from '@/components/AppDataProvider';
 
 interface Meeting {
   id: string;
@@ -32,7 +33,8 @@ const EMPTY_FORM = { title: '', platform: 'Google Meet', link: '', date: '', tim
 export default function MeetingsPage() {
   const { user } = useAuth();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [allUsers, setAllUsers] = useState<AppUser[]>([]);
+  // const [allUsers, setAllUsers] = useState<AppUser[]>([]);
+  const allUsers = useUsers() as AppUser[]; // shared roster — see src/components/AppDataProvider.tsx
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newMeeting, setNewMeeting] = useState(EMPTY_FORM);
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
@@ -48,10 +50,10 @@ export default function MeetingsPage() {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Meeting[];
       setMeetings(data.filter(m => !m.isHidden));
     });
-    const unsubUsers = onSnapshot(query(collection(db, 'users')), (snapshot) => {
-      setAllUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as AppUser[]);
-    });
-    return () => { unsubscribe(); unsubUsers(); };
+    // const unsubUsers = onSnapshot(query(collection(db, 'users')), (snapshot) => {
+    //   setAllUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as AppUser[]);
+    // });
+    return () => { unsubscribe(); };
   }, [user]);
 
   const toggleParticipant = (uid: string) => {

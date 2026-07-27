@@ -1,15 +1,19 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { Users, Plus, Edit2, Trash2, X } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import MemberSelect from '@/components/MemberSelect';
+import { useUsers } from '@/components/AppDataProvider';
 
 export default function AdminTeams() {
   const [teams, setTeams] = useState<any[]>([]);
-  const [leads, setLeads] = useState<any[]>([]);
-  const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+  // const [leads, setLeads] = useState<any[]>([]);
+  // const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+  const allUsers = useUsers(); // shared roster — see src/components/AppDataProvider.tsx
+  const leads = useMemo(() => allUsers.filter((u: any) => u.role === 'lead'), [allUsers]);
+  const assignableUsers = useMemo(() => allUsers.filter((u: any) => u.role === 'user' || u.role === 'lead'), [allUsers]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newTeam, setNewTeam] = useState<{ name: string; department: string; leadId: string; members: string[] }>({ name: '', department: '', leadId: '', members: [] });
   const [loading, setLoading] = useState(false);
@@ -22,12 +26,12 @@ export default function AdminTeams() {
       const teamsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTeams(teamsData);
     });
-    const unsubUsers = onSnapshot(query(collection(db, 'users')), snapshot => {
-      const allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setLeads(allUsers.filter((u: any) => u.role === 'lead'));
-      setAssignableUsers(allUsers.filter((u: any) => u.role === 'user' || u.role === 'lead'));
-    });
-    return () => { unsubTeams(); unsubUsers(); };
+    // const unsubUsers = onSnapshot(query(collection(db, 'users')), snapshot => {
+    //   const allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    //   setLeads(allUsers.filter((u: any) => u.role === 'lead'));
+    //   setAssignableUsers(allUsers.filter((u: any) => u.role === 'user' || u.role === 'lead'));
+    // });
+    return () => { unsubTeams(); };
   }, []);
 
   const handleCreateTeam = async () => {

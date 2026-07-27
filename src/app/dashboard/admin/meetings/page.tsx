@@ -5,6 +5,7 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { newJitsiLink, joinUrl, isUpcoming, openGmailCompose } from '@/utils/meeting';
 import { useAuth } from '@/components/AuthProvider';
+import { useUsers } from '@/components/AppDataProvider';
 import { X, Plus, Video, Users, Calendar, Clock, Zap, Trash2 } from 'lucide-react';
 
 interface Meeting {
@@ -33,7 +34,8 @@ const EMPTY_FORM = { title: '', platform: 'Google Meet', link: '', date: '', tim
 export default function AdminMeetings() {
   const { user } = useAuth();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [allUsers, setAllUsers] = useState<AppUser[]>([]);
+  // const [allUsers, setAllUsers] = useState<AppUser[]>([]);
+  const allUsers = useUsers() as AppUser[]; // shared roster — see src/components/AppDataProvider.tsx
   const [teams, setTeams] = useState<any[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isInstantModalOpen, setIsInstantModalOpen] = useState(false);
@@ -58,13 +60,13 @@ export default function AdminMeetings() {
       }
     );
     // Used to build the "invite participants" picker in the schedule modal.
-    const unsubUsers = onSnapshot(query(collection(db, 'users')), (snapshot) => {
-      setAllUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as AppUser[]);
-    });
+    // const unsubUsers = onSnapshot(query(collection(db, 'users')), (snapshot) => {
+    //   setAllUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as AppUser[]);
+    // });
     const unsubTeams = onSnapshot(query(collection(db, 'teams')), (snapshot) => {
       setTeams(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    return () => { unsubMeetings(); unsubUsers(); unsubTeams(); };
+    return () => { unsubMeetings(); unsubTeams(); };
   }, [user]);
 
   const toggleParticipant = (uid: string) => {

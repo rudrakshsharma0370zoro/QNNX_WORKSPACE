@@ -19,6 +19,7 @@ import {
   Legend,
   ArcElement
 } from 'chart.js';
+import { useUsers, useActivityLog } from '@/components/AppDataProvider';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
@@ -58,8 +59,11 @@ const getDayCounts = (tasksArray: any[], targetStatus: string) => {
 export default function LeadDashboard() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [meetings, setMeetings] = useState<any[]>([]);
-  const [logs, setLogs] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  // const [logs, setLogs] = useState<any[]>([]);
+  // const [users, setUsers] = useState<any[]>([]);
+  const users = useUsers(); // shared roster — see src/components/AppDataProvider.tsx
+  const sharedActivityLog = useActivityLog(); // shared, top 20, newest first
+  const logs = useMemo(() => sharedActivityLog.slice(0, 10), [sharedActivityLog]);
   const [timeFilter, setTimeFilter] = useState<'all' | 'week'>('all');
 
   useEffect(() => {
@@ -69,13 +73,13 @@ export default function LeadDashboard() {
     const unsubMeetings = onSnapshot(query(collection(db, 'meetings'), orderBy('date', 'desc'), limit(5)), snapshot => {
       setMeetings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    const unsubLogs = onSnapshot(query(collection(db, 'activityLog'), orderBy('createdAt', 'desc'), limit(10)), snapshot => {
-      setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    const unsubUsers = onSnapshot(query(collection(db, 'users')), snapshot => {
-      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    return () => { unsubTasks(); unsubMeetings(); unsubLogs(); unsubUsers(); };
+    // const unsubLogs = onSnapshot(query(collection(db, 'activityLog'), orderBy('createdAt', 'desc'), limit(10)), snapshot => {
+    //   setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // });
+    // const unsubUsers = onSnapshot(query(collection(db, 'users')), snapshot => {
+    //   setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // });
+    return () => { unsubTasks(); unsubMeetings(); };
   }, []);
 
   // Apply time filter

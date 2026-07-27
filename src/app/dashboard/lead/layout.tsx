@@ -8,6 +8,7 @@ import GlobalSearch from '@/components/GlobalSearch';
 import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Bell, Settings, LogOut, Briefcase, Moon, X, Clock } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { useActivityLog } from '@/components/AppDataProvider';
 
 export default function LeadLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -15,24 +16,26 @@ export default function LeadLayout({ children }: { children: React.ReactNode }) 
   const { user, role, profile, loading, logout } = useAuth();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  // const [notifications, setNotifications] = useState<any[]>([]);
+  const sharedActivityLog = useActivityLog(); // shared, top 20, newest first
+  const notifications = sharedActivityLog.slice(0, 10);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   useEffect(() => {
     if (!loading && (!user || role !== 'lead')) {
       router.push('/');
     }
   }, [user, role, loading, router]);
 
-  useEffect(() => {
-    if (!user) return;
-    const q = query(collection(db, 'activityLog'), orderBy('createdAt', 'desc'), limit(10));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setNotifications(notifs);
-    });
-    return () => unsubscribe();
-  }, [user]);
+  // useEffect(() => {
+  //   if (!user) return;
+  //   const q = query(collection(db, 'activityLog'), orderBy('createdAt', 'desc'), limit(10));
+  //   const unsubscribe = onSnapshot(q, (snapshot) => {
+  //     const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  //     setNotifications(notifs);
+  //   });
+  //   return () => unsubscribe();
+  // }, [user]);
 
 
 

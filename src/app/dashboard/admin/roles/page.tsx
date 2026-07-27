@@ -1,44 +1,42 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ShieldCheck, UserCog, User } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { useUsers } from '@/components/AppDataProvider';
 
 export default function AdminRolesPermissionsRBAC() {
-  const [users, setUsers] = useState<any[]>([]);
+  // const [users, setUsers] = useState<any[]>([]);
+  const rawUsers = useUsers(); // shared roster — see src/components/AppDataProvider.tsx
 
-  useEffect(() => {
-    const q = query(collection(db, 'users'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      let usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
-      
-      // Filter out logically deleted users (if a deletedAt or isActive flag exists)
-      usersData = usersData.filter(u => !u.deletedAt && u.isActive !== false);
+  // Same filter/dedupe/sort pipeline as before, now derived from the shared
+  // roster in memory instead of re-running on every Firestore snapshot.
+  const users = useMemo(() => {
+    // Filter out logically deleted users (if a deletedAt or isActive flag exists)
+    let usersData = rawUsers.filter((u: any) => !u.deletedAt && u.isActive !== false);
 
-      // Deduplicate by email, keeping the most recently updated record
-      const uniqueUsersMap = new Map<string, any>();
-      
-      // Sort users by updatedAt descending first, so the most recent is encountered first
-      usersData.sort((a, b) => {
-        const timeA = a.updatedAt?.toMillis ? a.updatedAt.toMillis() : (new Date(a.updatedAt || 0)).getTime();
-        const timeB = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : (new Date(b.updatedAt || 0)).getTime();
-        return timeB - timeA;
-      });
+    // Deduplicate by email, keeping the most recently updated record
+    const uniqueUsersMap = new Map<string, any>();
 
-      usersData.forEach(user => {
-        if (!user.email) return;
-        const emailLower = user.email.toLowerCase();
-        if (!uniqueUsersMap.has(emailLower)) {
-          uniqueUsersMap.set(emailLower, user);
-        }
-      });
-
-      setUsers(Array.from(uniqueUsersMap.values()));
+    // Sort users by updatedAt descending first, so the most recent is encountered first
+    usersData = [...usersData].sort((a: any, b: any) => {
+      const timeA = a.updatedAt?.toMillis ? a.updatedAt.toMillis() : (new Date(a.updatedAt || 0)).getTime();
+      const timeB = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : (new Date(b.updatedAt || 0)).getTime();
+      return timeB - timeA;
     });
-    return () => unsubscribe();
-  }, []);
+
+    usersData.forEach((user: any) => {
+      if (!user.email) return;
+      const emailLower = user.email.toLowerCase();
+      if (!uniqueUsersMap.has(emailLower)) {
+        uniqueUsersMap.set(emailLower, user);
+      }
+    });
+
+    return Array.from(uniqueUsersMap.values());
+  }, [rawUsers]);
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     // Optimistic update

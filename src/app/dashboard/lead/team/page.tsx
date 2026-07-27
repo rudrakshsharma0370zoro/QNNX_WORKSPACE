@@ -1,26 +1,29 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Mail, Briefcase, CheckCircle2 } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { useAuth } from '@/components/AuthProvider';
+import { useUsers } from '@/components/AppDataProvider';
 
 export default function TeamPage() {
   const { user } = useAuth();
-  const [users, setUsers] = useState<any[]>([]);
+  // const [users, setUsers] = useState<any[]>([]);
+  // Fetch all team members (users with role 'user'), derived from the shared roster.
+  const allUsers = useUsers(); // shared roster — see src/components/AppDataProvider.tsx
+  const users = useMemo(() => allUsers.filter((u: any) => u.role === 'user'), [allUsers]);
   const [tasks, setTasks] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user) return; // Wait for auth to resolve before fetching
-    // Fetch all team members (users with role 'user')
-    const unsubUsers = onSnapshot(query(collection(db, 'users'), where('role', '==', 'user')), snapshot => {
-      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    // const unsubUsers = onSnapshot(query(collection(db, 'users'), where('role', '==', 'user')), snapshot => {
+    //   setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // });
     // Fetch all active tasks to calculate workload
     const unsubTasks = onSnapshot(query(collection(db, 'tasks')), snapshot => {
       setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => { unsubUsers(); unsubTasks(); };
+    return () => { unsubTasks(); };
   }, [user]);
 
   // Compute active tasks (Pending or In Progress) per user

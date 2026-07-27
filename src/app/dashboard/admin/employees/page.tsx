@@ -1,28 +1,31 @@
 "use client";
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { X } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
+import { useUsers } from '@/components/AppDataProvider';
 
 export default function AdminEmployees() {
   const router = useRouter();
   const { user } = useAuth();
-  const [employees, setEmployees] = useState<any[]>([]);
+  // const [employees, setEmployees] = useState<any[]>([]);
+  const allUsers = useUsers(); // shared roster — see src/components/AppDataProvider.tsx
+  const employees = useMemo(() => allUsers.filter((u: any) => u.role === 'user'), [allUsers]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return; // Wait for auth to resolve before fetching
-    const unsubUsers = onSnapshot(query(collection(db, 'users'), where('role', '==', 'user')), snapshot => {
-      setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    // const unsubUsers = onSnapshot(query(collection(db, 'users'), where('role', '==', 'user')), snapshot => {
+    //   setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // });
     const unsubTasks = onSnapshot(query(collection(db, 'tasks')), snapshot => {
       setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => { unsubUsers(); unsubTasks(); };
+    return () => { unsubTasks(); };
   }, [user]);
 
   return (

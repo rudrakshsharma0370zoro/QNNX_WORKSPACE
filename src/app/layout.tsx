@@ -1,5 +1,6 @@
 import './globals.css'
 import { AuthProvider } from '@/components/AuthProvider'
+import { AppDataProvider } from '@/components/AppDataProvider'
 import { ThemeProvider } from '@/components/ThemeProvider'
 
 export default function RootLayout({
@@ -16,7 +17,9 @@ export default function RootLayout({
           enableSystem={false}
           themes={['light', 'dark', 'reading']}
         >
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <AppDataProvider>{children}</AppDataProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

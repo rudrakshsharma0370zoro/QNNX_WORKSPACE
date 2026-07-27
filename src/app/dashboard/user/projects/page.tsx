@@ -1,15 +1,18 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { useAuth } from '@/components/AuthProvider';
+import { useUsers } from '@/components/AppDataProvider';
 import { Briefcase, ChevronRight } from 'lucide-react';
 
 export default function UserProjects() {
   const { user } = useAuth();
   const [projects, setProjects] = useState<any[]>([]);
-  const [leads, setLeads] = useState<any[]>([]);
+  // const [leads, setLeads] = useState<any[]>([]);
+  const allUsers = useUsers(); // shared roster — see src/components/AppDataProvider.tsx
+  const leads = useMemo(() => allUsers.filter((u: any) => u.role === 'lead'), [allUsers]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -17,10 +20,10 @@ export default function UserProjects() {
       const allProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setProjects(allProjects.filter((p: any) => p.employeeIds?.includes(user.uid)));
     });
-    const unsubLeads = onSnapshot(query(collection(db, 'users'), where('role', '==', 'lead')), snapshot => {
-      setLeads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    return () => { unsubProjects(); unsubLeads(); };
+    // const unsubLeads = onSnapshot(query(collection(db, 'users'), where('role', '==', 'lead')), snapshot => {
+    //   setLeads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // });
+    return () => { unsubProjects(); };
   }, [user?.uid]);
 
   return (

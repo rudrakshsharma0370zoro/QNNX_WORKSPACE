@@ -1,16 +1,21 @@
 "use client";
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { Briefcase, ChevronRight, Filter, Plus, Edit2, Trash2, X, Users } from 'lucide-react';
 import Link from 'next/link';
 import MemberSelect from '@/components/MemberSelect';
+import { useUsers } from '@/components/AppDataProvider';
 
 export default function AdminProjects() {
   const [projects, setProjects] = useState<any[]>([]);
-  const [leads, setLeads] = useState<any[]>([]);
-  const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+  // const [leads, setLeads] = useState<any[]>([]);
+  // const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+  const allUsers = useUsers(); // shared roster — see src/components/AppDataProvider.tsx
+  const leads = useMemo(() => allUsers.filter((u: any) => u.role === 'lead'), [allUsers]);
+  // Members can be any active employee or lead (not pending signups or admins).
+  const assignableUsers = useMemo(() => allUsers.filter((u: any) => u.role === 'user' || u.role === 'lead'), [allUsers]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newProject, setNewProject] = useState<{ name: string; deadline: string; status: string; leadId: string; employeeIds: string[] }>({ name: '', deadline: '', status: 'In Progress', leadId: '', employeeIds: [] });
   const [loading, setLoading] = useState(false);
@@ -46,13 +51,12 @@ export default function AdminProjects() {
     const unsubProjects = onSnapshot(query(collection(db, 'projects')), snapshot => {
       setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    const unsubUsers = onSnapshot(query(collection(db, 'users')), snapshot => {
-      const allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setLeads(allUsers.filter((u: any) => u.role === 'lead'));
-      // Members can be any active employee or lead (not pending signups or admins).
-      setAssignableUsers(allUsers.filter((u: any) => u.role === 'user' || u.role === 'lead'));
-    });
-    return () => { unsubProjects(); unsubUsers(); };
+    // const unsubUsers = onSnapshot(query(collection(db, 'users')), snapshot => {
+    //   const allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    //   setLeads(allUsers.filter((u: any) => u.role === 'lead'));
+    //   setAssignableUsers(allUsers.filter((u: any) => u.role === 'user' || u.role === 'lead'));
+    // });
+    return () => { unsubProjects(); };
   }, []);
 
   const handleCreateProject = async () => {

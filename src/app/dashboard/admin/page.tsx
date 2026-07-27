@@ -19,6 +19,7 @@ import {
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, where, doc, deleteDoc } from 'firebase/firestore';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { useUsers } from '@/components/AppDataProvider';
 import { useEffect, useMemo } from 'react';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
@@ -61,8 +62,12 @@ export default function AdminOverview() {
   const [selectedYear, setSelectedYear] = useState('2026');
   
   const [projects, setProjects] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+  // const [users, setUsers] = useState<any[]>([]);
+  // const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+  const users = useUsers(); // shared roster — see src/components/AppDataProvider.tsx
+  // Real pending sign-ups awaiting an admin's role assignment, derived from
+  // the shared roster in memory instead of running a second Firestore query.
+  const pendingUsers = useMemo(() => users.filter((u: any) => u.role === 'pending'), [users]);
   const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null);
   const [approvalError, setApprovalError] = useState('');
 
@@ -70,19 +75,16 @@ export default function AdminOverview() {
     const unsubProjects = onSnapshot(query(collection(db, 'projects')), (snapshot) => {
       setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    const unsubUsers = onSnapshot(query(collection(db, 'users')), (snapshot) => {
-      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    // Real pending sign-ups awaiting an admin's role assignment. This
-    // replaces what used to be two hardcoded "Q3 Financial Report" /
-    // "Hardware Request" cards with buttons that did nothing.
-    const unsubPending = onSnapshot(
-      query(collection(db, 'users'), where('role', '==', 'pending')),
-      (snapshot) => {
-        setPendingUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-      }
-    );
-    return () => { unsubProjects(); unsubUsers(); unsubPending(); };
+    // const unsubUsers = onSnapshot(query(collection(db, 'users')), (snapshot) => {
+    //   setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // });
+    // const unsubPending = onSnapshot(
+    //   query(collection(db, 'users'), where('role', '==', 'pending')),
+    //   (snapshot) => {
+    //     setPendingUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    //   }
+    // );
+    return () => { unsubProjects(); };
   }, []);
 
   // Approve: assigns the real role via the backend (sets the authoritative

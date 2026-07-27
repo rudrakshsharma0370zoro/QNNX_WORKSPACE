@@ -4,23 +4,24 @@ import { useState, useEffect } from 'react';
 import { Bell, Clock, Calendar } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { useActivityLog } from '@/components/AppDataProvider';
 
 export default function AdminNotificationsCenter() {
-  const [notifications, setNotifications] = useState<any[]>([]);
+  // const [notifications, setNotifications] = useState<any[]>([]);
+  // Shared, top-20, newest-first — see src/components/AppDataProvider.tsx.
+  // The backend (logActivityServer) writes each entry with a `createdAt`
+  // field, not `timestamp`; the shared listener already orders by the
+  // correct field.
+  const notifications = useActivityLog();
 
-  useEffect(() => {
-    // The backend (logActivityServer) writes each entry with a `createdAt`
-    // field, not `timestamp`. Firestore's orderBy excludes any document that
-    // lacks the ordered field entirely, so querying by `timestamp` here
-    // silently returned zero results — every real activity log entry was
-    // filtered out before it ever reached this page.
-    const q = query(collection(db, 'activityLog'), orderBy('createdAt', 'desc'), limit(20));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setNotifications(notifs);
-    });
-    return () => unsubscribe();
-  }, []);
+  // useEffect(() => {
+  //   const q = query(collection(db, 'activityLog'), orderBy('createdAt', 'desc'), limit(20));
+  //   const unsubscribe = onSnapshot(q, (snapshot) => {
+  //     const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  //     setNotifications(notifs);
+  //   });
+  //   return () => unsubscribe();
+  // }, []);
 
   return (
     <div className="font-sans text-gray-800 bg-gray-50/30 p-6 lg:p-8 min-h-full w-full">
