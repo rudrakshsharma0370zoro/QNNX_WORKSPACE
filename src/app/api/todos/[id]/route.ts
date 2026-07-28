@@ -24,8 +24,8 @@ export const PATCH = requireRole(['admin', 'lead', 'user'], async (req, { params
       return NextResponse.json({ error: 'Unauthorized: Cannot edit another user\'s to-do item' }, { status: 403 });
     }
 
-    if (body.isComplete !== undefined) {
-      await firestoreAdminUpdate('todos', id, { isComplete: body.isComplete });
+    if (body.isCompleted !== undefined) {
+      await firestoreAdminUpdate('todos', id, { isCompleted: body.isCompleted });
     }
     
     // Explicitly DO NOT call logActivityServer here to ensure privacy

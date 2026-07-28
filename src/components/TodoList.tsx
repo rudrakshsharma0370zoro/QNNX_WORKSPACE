@@ -7,7 +7,7 @@ interface Todo {
   id: string;
   description: string;
   deadline: string;
-  isComplete: boolean;
+  isCompleted: boolean;
   createdAt: string;
 }
 
@@ -63,14 +63,14 @@ export default function TodoList() {
   };
 
   const toggleComplete = async (todo: Todo) => {
-    const newStatus = !todo.isComplete;
+    const newStatus = !todo.isCompleted;
     // Optimistic update
-    setTodos(todos.map(t => t.id === todo.id ? { ...t, isComplete: newStatus } : t));
+    setTodos(todos.map(t => t.id === todo.id ? { ...t, isCompleted: newStatus } : t));
     
     try {
       const res = await fetchWithAuth(`/api/todos/${todo.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ isComplete: newStatus })
+        body: JSON.stringify({ isCompleted: newStatus })
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -78,7 +78,7 @@ export default function TodoList() {
       }
     } catch (err: any) {
       // Revert on error
-      setTodos(todos.map(t => t.id === todo.id ? { ...t, isComplete: !newStatus } : t));
+      setTodos(todos.map(t => t.id === todo.id ? { ...t, isCompleted: !newStatus } : t));
       alert(err.message || 'Unauthorized or failed to update to-do item');
       console.error(err);
     }
@@ -163,26 +163,26 @@ export default function TodoList() {
             ) : (
               <tbody className="divide-y divide-gray-100">
                 {todos.map((todo, idx) => (
-                  <tr key={todo.id} className={`hover:bg-gray-50/50 transition-colors group ${todo.isComplete ? 'bg-gray-50/50' : ''}`}>
+                  <tr key={todo.id} className={`hover:bg-gray-50/50 transition-colors group ${todo.isCompleted === true ? 'bg-gray-50/50' : ''}`}>
                     <td className="px-6 py-4 text-center text-gray-400 font-medium text-xs">
                       {idx + 1}
                     </td>
                     <td className="px-6 py-4">
-                      <div className={`font-medium transition-colors ${todo.isComplete ? 'text-gray-400 line-through' : 'text-gray-900 group-hover:text-indigo-600'}`}>
+                      <div className={`font-medium transition-colors ${todo.isCompleted === true ? 'text-gray-400 line-through' : 'text-gray-900 group-hover:text-indigo-600'}`}>
                         {todo.description}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className={`text-[12px] font-semibold px-2.5 py-1 rounded-md border ${todo.isComplete ? 'text-gray-400 border-gray-200 bg-gray-50' : 'text-indigo-700 bg-indigo-50 border-indigo-100'}`}>
+                      <span className={`text-[12px] font-semibold px-2.5 py-1 rounded-md border ${todo.isCompleted === true ? 'text-gray-400 border-gray-200 bg-gray-50' : 'text-indigo-700 bg-indigo-50 border-indigo-100'}`}>
                         {new Date(todo.deadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <button 
                         onClick={() => toggleComplete(todo)}
-                        className={`inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors ${todo.isComplete ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100' : 'text-gray-300 hover:text-indigo-500 hover:bg-indigo-50'}`}
+                        className={`inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors ${todo.isCompleted === true ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100' : 'text-gray-300 hover:text-indigo-500 hover:bg-indigo-50'}`}
                       >
-                        {todo.isComplete ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
+                        {todo.isCompleted === true ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
                       </button>
                     </td>
                     <td className="px-6 py-4 text-right">

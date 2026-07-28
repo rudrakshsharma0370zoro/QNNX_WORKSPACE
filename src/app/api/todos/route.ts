@@ -40,7 +40,7 @@ export const POST = requireRole(['admin', 'lead', 'user'], async (req) => {
       userId: uid, // Strict lock to the current user
       description: body.description,
       deadline: body.deadline,
-      isComplete: false,
+      isCompleted: false,
       createdAt: new Date().toISOString()
     };
 

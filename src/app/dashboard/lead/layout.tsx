@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
+import NotificationBell from '@/components/NotificationBell';
 import GlobalSearch from '@/components/GlobalSearch';
 import { LayoutDashboard, Users, CheckSquare, Calendar, FolderOpen, Bell, Settings, LogOut, Briefcase, Moon, X, Clock, ListTodo } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
@@ -99,45 +100,8 @@ export default function LeadLayout({ children }: { children: React.ReactNode }) 
 
           <div className="flex items-center gap-6">
             {/* Notifications Dropdown */}
-            <div className="relative">
-              <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="relative text-gray-500 hover:text-gray-700">
-                <Bell className="w-5 h-5" />
-                {notifications.length > 0 && (
-                  <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-                )}
-              </button>
-              {isNotifOpen && (
-                <div className="absolute right-0 mt-3 w-80 bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
-                  <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center">
-                    <span className="text-sm font-bold text-gray-900">Notifications</span>
-                    <button onClick={() => setIsNotifOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors" title="Close notifications">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="max-h-80 overflow-y-auto">
-                    {notifications.length === 0 ? (
-                      <p className="px-4 py-6 text-[12px] text-gray-500 text-center">No new notifications.</p>
-                    ) : (
-                      <div className="divide-y divide-gray-50">
-                        {notifications.map(notif => (
-                          <div key={notif.id} className="p-3 hover:bg-gray-50 flex items-start gap-3 transition-colors">
-                            <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
-                              {notif.type === 'meeting_scheduled' ? <Calendar className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs text-gray-900 font-medium truncate">{notif.message}</p>
-                              <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mt-1">
-                                <Clock className="w-3 h-3" />
-                                {new Date(notif.createdAt).toLocaleString()}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+            <div className="flex items-center gap-4 border-r border-gray-200 pr-6 relative">
+              <NotificationBell />
             </div>
             <div className="relative">
               <button 
