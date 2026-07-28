@@ -9,10 +9,9 @@ export const runtime = 'edge';
 /**
  * PATCH /api/meetings/[id]/remove
  * 
- * Soft-deletes a meeting by setting `isHidden: true`.
- * RBAC: Admin can delete any. Lead can only delete their own.
+ * Soft-deletes a meeting (globally for admins, personally for leads/users).
  */
-export const PATCH = requireRole(['admin', 'lead'], async (req, { params }) => {
+export const PATCH = requireRole(['admin', 'lead', 'user'], async (req, { params }) => {
   try {
     const resolvedParams = await params;
     const rawId = resolvedParams.id;
@@ -24,20 +23,22 @@ export const PATCH = requireRole(['admin', 'lead'], async (req, { params }) => {
       return NextResponse.json({ error: 'Not Found', details: 'Meeting not found.' }, { status: 404 });
     }
 
-    // Role-Based Validation
-    if (user.role === 'lead' && meeting.createdBy !== user.uid) {
-      return NextResponse.json(
-        { error: 'Forbidden', details: 'Leads can only remove meetings they created.' },
-        { status: 403 }
-      );
+    // Role-Based Validation & Deletion
+    if (user.role === 'admin') {
+      // Admin deletes globally
+      await firestoreAdminUpdate('meetings', meetingId, {
+        isHidden: true,
+        updatedBy: user.uid,
+        updatedAt: new Date().toISOString()
+      });
+    } else {
+      // Lead and User delete personally (hide from their own dashboard)
+      // We will need to use firestoreAdminCommit for array appending
+      const { firestoreAdminCommit } = await import('@/lib/firestoreAdmin');
+      await firestoreAdminCommit('meetings', meetingId, {
+        appendUnique: { hiddenBy: [user.uid] }
+      });
     }
-
-    // Soft delete
-    await firestoreAdminUpdate('meetings', meetingId, {
-      isHidden: true,
-      updatedBy: user.uid,
-      updatedAt: new Date().toISOString()
-    });
 
     const actorName = user.name || user.email || 'Someone';
     const meetingTitle = meeting.title || 'Untitled Meeting';

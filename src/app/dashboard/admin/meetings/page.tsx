@@ -56,7 +56,7 @@ export default function AdminMeetings() {
       query(collection(db, 'meetings'), orderBy('createdAt', 'desc')),
       (snapshot) => {
         const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Meeting[];
-        setMeetings(data.filter(m => !m.isHidden));
+        setMeetings(data.filter(m => !m.isHidden && !m.hiddenBy?.includes(user?.uid)));
       }
     );
     // Used to build the "invite participants" picker in the schedule modal.

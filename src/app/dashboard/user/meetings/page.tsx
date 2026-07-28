@@ -3,11 +3,15 @@ import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebaseClient';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { useAuth } from '@/components/AuthProvider';
-import { joinUrl } from '@/utils/meeting';
+import { isUpcoming, joinUrl } from '@/utils/meeting';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { Clock, Trash2 } from 'lucide-react';
 
 export default function UserMeetings() {
   const { user } = useAuth();
   const [meetings, setMeetings] = useState<any[]>([]);
+  const [upcomingMeetings, setUpcomingMeetings] = useState<any[]>([]);
+  const [pastMeetings, setPastMeetings] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -26,9 +30,11 @@ export default function UserMeetings() {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const mine = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-      const visible = mine.filter(m => !m.isHidden);
+      const visible = mine.filter(m => !m.isHidden && !m.hiddenBy?.includes(user?.uid));
       visible.sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
       setMeetings(visible);
+      setUpcomingMeetings(visible.filter(m => isUpcoming(m.date)));
+      setPastMeetings(visible.filter(m => !isUpcoming(m.date)));
     });
 
     return () => unsubscribe();
@@ -36,6 +42,21 @@ export default function UserMeetings() {
 
   const handleJoin = (meeting: any) => {
     window.open(joinUrl(meeting), '_blank');
+  };
+
+  const handleRemoveMeeting = async (meeting: any) => {
+    if (!window.confirm('Are you sure you want to remove this meeting?')) return;
+    try {
+      const res = await fetchWithAuth(`/api/meetings/${meeting.id}/remove`, {
+        method: 'PATCH',
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.details || body.error || 'Failed to remove meeting.');
+      }
+    } catch (e: any) {
+      alert(e.message);
+    }
   };
 
   return (
@@ -54,7 +75,7 @@ export default function UserMeetings() {
           </h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {meetings.map((meeting) => (
+            {upcomingMeetings.map((meeting) => (
               <div key={meeting.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between h-full min-h-[12rem] hover:border-indigo-300 transition-colors">
                 <div>
                   <h4 className="font-bold text-gray-900 line-clamp-2 break-words">{meeting.title}</h4>
@@ -86,13 +107,51 @@ export default function UserMeetings() {
               </div>
             ))}
 
-            {meetings.length === 0 && (
+            {upcomingMeetings.length === 0 && (
               <div className="col-span-full py-12 text-center bg-white rounded-xl border border-dashed border-gray-300">
                 <p className="text-[14px] text-gray-500 font-medium">You have no upcoming meetings scheduled.</p>
               </div>
             )}
           </div>
         </div>
+
+        {/* Past Meetings Section */}
+        {pastMeetings.length > 0 && (
+          <div className="pt-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Clock className="w-5 h-5 text-gray-500" />
+              <h2 className="text-lg font-semibold text-gray-900">Past Meetings</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {pastMeetings.map((meeting) => (
+                <div key={meeting.id} className="bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full opacity-80">
+                  <div className="flex justify-between items-start mb-4">
+                    <h3 className="font-semibold text-gray-700">{meeting.title}</h3>
+                    <button 
+                      onClick={() => handleRemoveMeeting(meeting)}
+                      className="text-gray-400 hover:text-red-600 transition-colors"
+                      title="Remove meeting"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 mt-auto">
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> {new Date(meeting.date).toLocaleDateString()}
+                    </div>
+                    {meeting.time && (
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <Clock className="w-4 h-4 text-gray-400" /> {meeting.time}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

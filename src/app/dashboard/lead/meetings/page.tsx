@@ -48,7 +48,7 @@ export default function MeetingsPage() {
     const q = query(collection(db, 'meetings'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Meeting[];
-      setMeetings(data.filter(m => !m.isHidden));
+      setMeetings(data.filter(m => !m.isHidden && !m.hiddenBy?.includes(user?.uid)));
     });
     // const unsubUsers = onSnapshot(query(collection(db, 'users')), (snapshot) => {
     //   setAllUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as AppUser[]);
@@ -287,7 +287,7 @@ export default function MeetingsPage() {
                       {meeting.type === 'instant' ? 'Instant' : 'Scheduled'}
                     </span>
                   </div>
-                  {meeting.createdBy === user?.uid ? (
+                  {true ? (
                     <button 
                       onClick={() => handleRemoveMeeting(meeting)}
                       className="text-gray-400 hover:text-red-600 transition-colors"
@@ -354,7 +354,7 @@ export default function MeetingsPage() {
               <div key={meeting.id} className="bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full opacity-80">
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="font-semibold text-gray-700">{meeting.title}</h3>
-                  {meeting.createdBy === user?.uid ? (
+                  {true ? (
                     <button 
                       onClick={() => handleRemoveMeeting(meeting)}
                       className="text-gray-400 hover:text-red-600 transition-colors"
