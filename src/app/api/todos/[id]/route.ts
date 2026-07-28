@@ -7,7 +7,9 @@ export const runtime = 'edge';
 // PATCH to update completion status
 export const PATCH = requireRole(['admin', 'lead', 'user'], async (req, { params }) => {
   try {
-    const { id } = await params;
+    const resolvedParams = await params;
+    const rawId = resolvedParams.id;
+    const id = Array.isArray(rawId) ? rawId[0] : rawId;
     const body = await req.json();
     const uid = req.user.uid;
 
@@ -40,7 +42,9 @@ export const PATCH = requireRole(['admin', 'lead', 'user'], async (req, { params
 // DELETE a todo
 export const DELETE = requireRole(['admin', 'lead', 'user'], async (req, { params }) => {
   try {
-    const { id } = await params;
+    const resolvedParams = await params;
+    const rawId = resolvedParams.id;
+    const id = Array.isArray(rawId) ? rawId[0] : rawId;
     const uid = req.user.uid;
 
     if (!id) {

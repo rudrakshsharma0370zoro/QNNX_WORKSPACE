@@ -22,3 +22,6 @@ tsconfig.tsbuildinfo
 # Cloudflare local state
 .wrangler/
 .dev.vars
+
+# Cloudflare/Vercel build output
+.vercel/
