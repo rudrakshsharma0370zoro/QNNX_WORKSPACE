@@ -57,7 +57,20 @@ export default function Home() {
         await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (err: any) {
-      setError(err?.message || "Authentication failed. Check your details.");
+      if (
+        err?.code === "auth/invalid-credential" ||
+        err?.code === "auth/user-not-found" ||
+        err?.code === "auth/wrong-password" ||
+        err?.code === "auth/invalid-email" ||
+        err?.message?.includes("auth/invalid-credential") ||
+        err?.message?.includes("auth/user-not-found") ||
+        err?.message?.includes("auth/wrong-password") ||
+        err?.message?.includes("auth/invalid-email")
+      ) {
+        setError("Invalid Email or Password");
+      } else {
+        setError(err?.message || "Authentication failed. Check your details.");
+      }
     } finally {
       setAuthLoading(false);
     }
