@@ -69,8 +69,8 @@ export default function MeetingsPage() {
   };
 
   const handleCreateMeeting = async () => {
-    if (!newMeeting.title.trim() || !newMeeting.date) {
-      setError('Title and date are required.');
+    if (!newMeeting.title.trim() || !newMeeting.date || !newMeeting.link.trim()) {
+      setError('Title, date, and meeting link are required.');
       return;
     }
     setLoading(true);
@@ -78,7 +78,12 @@ export default function MeetingsPage() {
     try {
       const res = await fetchWithAuth('/api/meetings', {
         method: 'POST',
-        body: JSON.stringify({ ...newMeeting, participants: selectedParticipants, type: 'scheduled' }),
+        body: JSON.stringify({
+          ...newMeeting,
+          link: newMeeting.link.trim() || null,
+          participants: selectedParticipants,
+          type: 'scheduled',
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -222,12 +227,10 @@ export default function MeetingsPage() {
               <input type="text" value={newMeeting.title} onChange={e => setNewMeeting({...newMeeting, title: e.target.value})} placeholder="Meeting Title" className="w-full px-3 py-2 border rounded-lg text-sm" />
               <input type="date" value={newMeeting.date} onChange={e => setNewMeeting({...newMeeting, date: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-sm" />
               <input type="time" value={newMeeting.time} onChange={e => setNewMeeting({...newMeeting, time: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-sm" />
-              <select value={newMeeting.platform} onChange={e => setNewMeeting({...newMeeting, platform: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-sm">
-                <option value="Google Meet">Google Meet</option>
-                <option value="Zoom">Zoom</option>
-                <option value="Microsoft Teams">Microsoft Teams</option>
-              </select>
-              <input type="text" value={newMeeting.link} onChange={e => setNewMeeting({...newMeeting, link: e.target.value})} placeholder="Meeting Link (optional)" className="w-full px-3 py-2 border rounded-lg text-sm" />
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Meeting Link (Required)</label>
+                <input type="text" value={newMeeting.link} onChange={e => setNewMeeting({...newMeeting, link: e.target.value})} placeholder="https://meet.google.com/..." className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
 
               <div>
                 <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
